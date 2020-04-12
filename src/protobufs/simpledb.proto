@@ -1,0 +1,24 @@
+syntax  = "proto3";
+
+package simpledb.proto;
+
+enum OpType {
+    GET = 0;
+    SET = 1;
+    DELETE = 2;
+};
+
+message KVRequest {
+    uint64 id = 1;
+    OpType op = 2;
+    bytes key = 3;
+    bytes val = 4;
+    bool immutable = 5;
+};
+
+message KVResponse {
+    uint64 id = 1;
+    OpType op = 2;
+    uint32 return_code = 3;
+    bytes val = 4;
+};
