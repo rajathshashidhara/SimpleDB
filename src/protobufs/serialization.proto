@@ -1,0 +1,8 @@
+syntax  = "proto3";
+
+package simpledb.proto;
+
+message FileMetadata {
+    bool immutable = 1;
+    bytes content = 2;
+};
