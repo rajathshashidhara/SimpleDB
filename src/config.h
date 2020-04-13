@@ -1,0 +1,7 @@
+#ifndef SIMPLEDB_CONFIG
+#define SIMPLEDB_CONFIG
+
+#define DEFAULT_SERVER_PORT             20021
+#define DEFAULT_BUFFER_ALLOC_SIZE       128 * 1024 * 1024   /* 128 KB */
+
+#endif /* SIMPLEDB_CONFIG */
