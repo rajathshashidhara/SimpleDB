@@ -10,7 +10,7 @@ extern "C" {
     #include "config.h"
 }
 
-enum client_parse_e 
+enum client_parse_e
 {
     CLIENT_RECV_INIT,
     CLIENT_RECV_ALLOC_LEN,
@@ -83,7 +83,7 @@ static void on_msg_read(uv_stream_t* handle,
     if (nread == UV_EOF)
     {
         LOG(INFO) << "Connection closed. ";
-        
+
         uv_shutdown_t* req = new uv_shutdown_t();
         if (req == nullptr)
         {
@@ -95,11 +95,33 @@ static void on_msg_read(uv_stream_t* handle,
         return;
     }
 
+    if (nread == 0)
+    {
+        if (state->parse_state == CLIENT_RECV_ALLOC_LEN)
+        {
+            state->req_buf_length = 0;
+            state->req_buffer = nullptr;
+            state->parse_state = CLIENT_RECV_INIT;
+        }
+        else if (state->parse_state == CLIENT_RECV_ALLOC_PAYLOAD)
+        {
+            state->parse_state = CLIENT_RECV_LEN;
+            state->alloc_length = 0;
+            delete state->req_buffer;
+        }
+        else
+        {
+            LOG(ERROR) << "Read callback with nread=0";
+            uv_tcp_close_reset((uv_tcp_t*) handle, on_close_connection);
+        }
+        return;
+    }
+
     if (nread < 0)
     {
         LOG(ERROR) << "Failed to read. Error: " << uv_strerror(nread);
         uv_tcp_close_reset((uv_tcp_t*) handle, on_close_connection);
-                
+
         return;
     }
 
@@ -138,8 +160,16 @@ static void on_msg_read(uv_stream_t* handle,
             return;
         }
         /* Send response back */
-        state->resp_buf_length = resp.ByteSizeLong();
+        state->resp_buf_length = sizeof(size_t) + resp.ByteSizeLong();
         state->resp_buffer = new char[state->resp_buf_length];
+        *((size_t*) state->resp_buffer) = resp.ByteSizeLong();
+        if (!resp.SerializeToArray(state->resp_buffer + sizeof(size_t), resp.ByteSizeLong()))
+        {
+            LOG(ERROR) << "Failed to serialize response.";
+            uv_tcp_close_reset((uv_tcp_t*) handle, on_close_connection);
+            return;
+        }
+
         uv_write_t* write_req = new uv_write_t();
         uv_buf_t writebuf = uv_buf_init(state->resp_buffer, state->resp_buf_length);
         write_req->data = state;
@@ -181,7 +211,7 @@ static void alloc_readbuffer_cb(uv_handle_t* handle,
         state->parse_state = CLIENT_RECV_ALLOC_LEN;
         state->read_length = 0;
     }
-    else if(state->parse_state == CLIENT_RECV_LEN)
+    else if (state->parse_state == CLIENT_RECV_LEN)
     {
         state->req_buffer = new char[state->req_buf_length];
         state->alloc_length = state->req_buf_length;
@@ -190,7 +220,7 @@ static void alloc_readbuffer_cb(uv_handle_t* handle,
         {
             LOG(ERROR) << "Cannot allocate recv memory buffers";
             uv_tcp_close_reset((uv_tcp_t*) handle, on_close_connection);
-            
+
             return;
         }
 
@@ -204,7 +234,7 @@ static void alloc_readbuffer_cb(uv_handle_t* handle,
     {
         LOG(ERROR) << "Invalid parse state: " << state->parse_state;
         uv_tcp_close_reset((uv_tcp_t*) handle, on_close_connection);
-            
+
         return;
     }
 }
@@ -263,7 +293,7 @@ static void on_new_connection(uv_stream_t *server, int status)
 
 int simpledb::net::connections_main(unsigned port, unsigned backlog)
 {
-    
+
     struct sockaddr_in addr;
     int ret;
 
