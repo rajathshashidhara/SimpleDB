@@ -1,5 +1,7 @@
 # Prerequisites
 *.d
+*.pb.h
+*.pb.cc
 
 # Compiled Object files
 *.slo

@@ -18,7 +18,6 @@ message KVRequest {
 
 message KVResponse {
     uint64 id = 1;
-    OpType op = 2;
-    uint32 return_code = 3;
-    bytes val = 4;
+    uint32 return_code = 2;
+    bytes val = 3;
 };

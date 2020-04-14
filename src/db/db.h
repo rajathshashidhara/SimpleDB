@@ -1,8 +1,8 @@
 #ifndef SIMPLEDB_DB_H
 #define SIMPLEDB_DB_H
 
-#include "config.h"
 #include <string>
+#include "config.h"
 
 namespace simpledb::db
 {
