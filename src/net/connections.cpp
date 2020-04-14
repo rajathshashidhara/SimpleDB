@@ -2,6 +2,7 @@
 #include <glog/logging.h>
 
 #include "net/service.h"
+#include "net/connections.h"
 
 extern "C" {
     #include "uv.h"
@@ -120,9 +121,6 @@ static void on_msg_read(uv_stream_t* handle,
         state->parse_state = CLIENT_RECV_PAYLOAD;
         LOG(INFO) << "Received message: len=" << state->read_length;
 
-        /**
-         * TODO: Use the data here
-         */
         KVRequest req;
         KVResponse resp;
         if (!req.ParsePartialFromArray(state->req_buffer, state->req_buf_length))
@@ -263,7 +261,7 @@ static void on_new_connection(uv_stream_t *server, int status)
     }
 }
 
-int connections_main(unsigned port, unsigned backlog)
+int simpledb::net::connections_main(unsigned port, unsigned backlog)
 {
     
     struct sockaddr_in addr;

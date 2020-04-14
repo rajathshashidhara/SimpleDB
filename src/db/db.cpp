@@ -5,7 +5,7 @@
 #include "leveldb/cache.h"
 #include "protobufs/serialization.pb.h"
 
-#include "db.h"
+#include "db/db.h"
 
 namespace simpledb::db
 {
