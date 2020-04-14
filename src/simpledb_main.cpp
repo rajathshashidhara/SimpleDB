@@ -12,6 +12,8 @@ extern "C" {
 int main(int argc, char* argv[])
 {
     GOOGLE_PROTOBUF_VERIFY_VERSION;
+    google::InitGoogleLogging(argv[0]);
+
     if (simpledb::db::init() < 0)
         return -1;
 
@@ -22,5 +24,6 @@ int main(int argc, char* argv[])
         return -1;
 
     google::protobuf::ShutdownProtobufLibrary();
+
     return 0;
 }
