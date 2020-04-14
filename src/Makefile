@@ -26,12 +26,18 @@ LDLIBS := -luv -lleveldb -lformats $(PROTOBUF_LIBS) -lglog
 
 BIN := simpledb.out
 
-all: $(BIN)
+FORMATS_LIB := libformats.a
 
--include $(CXX_DEPS)
+all: $(FORMATS_LIB) $(BIN)
 
 $(BIN): $(CXX_OBJS)
 	$(CXX) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
+$(FORMATS_LIB):
+	$(MAKE) -C protobufs
+
 clean:
 	rm -vf $(CXX_OBJS) $(CXX_DEPS) $(BIN)
+	$(MAKE) -C protobufs clean
+
+-include $(CXX_DEPS)
