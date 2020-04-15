@@ -24,10 +24,8 @@ struct client_state_t
 {
     uv_tcp_t* connection;
     char* req_buffer;
-    char* resp_buffer;
     client_parse_e parse_state;
     size_t req_buf_length;
-    size_t resp_buf_length;
     size_t read_length;
     size_t alloc_length;
 };
@@ -38,10 +36,7 @@ static void on_close_connection(uv_handle_t* handle)
     client_state_t* state = (client_state_t*) stream->data;
 
     if (state->req_buffer != nullptr)
-        delete state->req_buffer;
-
-    if (state->resp_buffer != nullptr)
-        delete state->resp_buffer;
+        delete [] state->req_buffer;
 
     delete state;
     delete stream;
@@ -55,15 +50,12 @@ static void on_shutdown(uv_shutdown_t* req, int status)
     }
 
     on_close_connection((uv_handle_t*) req->handle);
+    delete req;
 }
 
 static void on_msg_write(uv_write_t* req, int status)
 {
-    client_state_t* state = (client_state_t*) req->data;
-    delete state->resp_buffer;
-
-    state->resp_buffer = nullptr;
-    state->resp_buf_length = 0;
+    delete [] ((char*) req->data);
 
     if (status < 0)
     {
@@ -107,7 +99,8 @@ static void on_msg_read(uv_stream_t* handle,
         {
             state->parse_state = CLIENT_RECV_LEN;
             state->alloc_length = 0;
-            delete state->req_buffer;
+            delete [] state->req_buffer;
+            state->req_buffer = nullptr;
         }
         else
         {
@@ -160,10 +153,17 @@ static void on_msg_read(uv_stream_t* handle,
             return;
         }
         /* Send response back */
-        state->resp_buf_length = sizeof(size_t) + resp.ByteSize();
-        state->resp_buffer = new char[state->resp_buf_length];
-        *((size_t*) state->resp_buffer) = resp.ByteSize();
-        if (!resp.SerializeToArray(state->resp_buffer + sizeof(size_t), resp.ByteSize()))
+        size_t resp_buf_length = sizeof(size_t) + resp.ByteSize();
+        char* resp_buffer = new char[resp_buf_length];
+        if (resp_buffer == nullptr)
+        {
+            LOG(ERROR) << "Failed to allocate memory.";
+            uv_close((uv_handle_t*) handle, on_close_connection);
+            return;
+        }
+
+        *((size_t*) resp_buffer) = resp.ByteSize();
+        if (!resp.SerializeToArray(resp_buffer + sizeof(size_t), resp.ByteSize()))
         {
             LOG(ERROR) << "Failed to serialize response.";
             uv_close((uv_handle_t*) handle, on_close_connection);
@@ -171,10 +171,10 @@ static void on_msg_read(uv_stream_t* handle,
         }
 
         uv_write_t* write_req = new uv_write_t();
-        uv_buf_t writebuf = uv_buf_init(state->resp_buffer, state->resp_buf_length);
-        write_req->data = state;
+        uv_buf_t writebuf = uv_buf_init(resp_buffer, resp_buf_length);
+        write_req->data = resp_buffer;
 
-        delete state->req_buffer;
+        delete [] state->req_buffer;
         state->req_buffer = nullptr;
         state->req_buf_length = state->alloc_length = state->read_length = 0;
 
@@ -283,8 +283,6 @@ static void on_new_connection(uv_stream_t *server, int status)
     state->read_length = 0;
     state->alloc_length = 0;
     state->parse_state = CLIENT_RECV_INIT;
-    state->resp_buffer = nullptr;
-    state->resp_buf_length = 0;
     stream->data = state;
 
     if ((ret = uv_read_start((uv_stream_t*) stream, alloc_readbuffer_cb, on_msg_read)) != 0)
