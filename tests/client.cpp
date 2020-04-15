@@ -1,5 +1,7 @@
 #include <iostream>
 #include <string>
+#include <fstream>
+#include <streambuf>
 #include <cstdlib>
 #include "protobufs/netformats.pb.h"
 
@@ -39,9 +41,16 @@ bool receive_response(int fd, KVResponse& resp)
     if (s == nullptr)
         return false;
 
-    if (recv(fd, s, len, 0) < (ssize_t)len)
-        return false;
-    
+    size_t offset = 0;
+    ssize_t ret;
+    while (offset < len)
+    {
+        if ((ret = recv(fd, s + offset, len - offset, 0)) < 0)
+            return false;
+
+        offset += ret;
+    }
+
     if (!resp.ParseFromArray(s, len))
         return false;
 
@@ -53,7 +62,7 @@ int main(int argc, char* argv[])
 {
     GOOGLE_PROTOBUF_VERIFY_VERSION;
 
-    if (argc < 3)
+    if (argc < 4)
         return 1;
 
     std::string ip(argv[1]);
@@ -76,29 +85,30 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    std::string key = "hello";
-    std::string value = "world!";
+    std::string key = argv[3];
+    std::ifstream f(argv[3]);
+    std::string value((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
     KVRequest req;
     KVResponse resp;
 
     int id = 1;
+    /* Set */
+    req.set_id(id++);
+    req.set_op(OpType::SET);
+    req.set_key(key);
+    req.set_val(value);
+    req.set_immutable(true);
+
+    if (!send_request(fd, req))
+        return 1;
+
+    if (!receive_response(fd, resp))
+        return 1;
+
+    std::cout << "key=" << key << " return_code=" << resp.return_code() << std::endl;
+
     while (1)
     {
-        /* Set */
-        req.set_id(id++);
-        req.set_op(OpType::SET);
-        req.set_key(key);
-        req.set_val(value);
-        req.set_immutable(true);
-
-        if (!send_request(fd, req))
-            return 1;
-        
-        if (!receive_response(fd, resp))
-            return 1;
-        
-        std::cout << "key=" << key << " return_code=" << resp.return_code() << std::endl;
-
         /* Get */
         req.set_id(id++);
         req.set_op(OpType::GET);
@@ -108,24 +118,24 @@ int main(int argc, char* argv[])
 
         if (!send_request(fd, req))
             return 1;
-        
+
         if (!receive_response(fd, resp))
             return 1;
-        
-        std::cout << "key=" << key << " return_code=" << resp.return_code() << " value=" << resp.val() << std::endl;
+
+        std::cout << "key=" << key << " return_code=" << resp.return_code() << " value_len=" << resp.val().length() << std::endl;
 
         /* Delete */
-        req.set_id(id++);
-        req.set_op(OpType::DELETE);
-        req.set_key(key);
+        // req.set_id(id++);
+        // req.set_op(OpType::DELETE);
+        // req.set_key(key);
 
-        if (!send_request(fd, req))
-            return 1;
-        
-        if (!receive_response(fd, resp))
-            return 1;
-        
-        std::cout << "key=" << key << " return_code=" << resp.return_code() << std::endl;
+        // if (!send_request(fd, req))
+        //     return 1;
+
+        // if (!receive_response(fd, resp))
+        //     return 1;
+
+        // std::cout << "key=" << key << " return_code=" << resp.return_code() << std::endl;
     }
 
     google::protobuf::ShutdownProtobufLibrary();

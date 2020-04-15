@@ -145,7 +145,7 @@ static void on_msg_read(uv_stream_t* handle,
 
         KVRequest req;
         KVResponse resp;
-        if (!req.ParsePartialFromArray(state->req_buffer, state->req_buf_length))
+        if (!req.ParseFromArray(state->req_buffer, state->req_buf_length))
         {
             LOG(ERROR) << "Failed to parse";
             uv_tcp_close_reset((uv_tcp_t*) handle, on_close_connection);
@@ -174,9 +174,9 @@ static void on_msg_read(uv_stream_t* handle,
         uv_buf_t writebuf = uv_buf_init(state->resp_buffer, state->resp_buf_length);
         write_req->data = state;
 
+        delete state->req_buffer;
         state->req_buffer = nullptr;
         state->req_buf_length = state->alloc_length = state->read_length = 0;
-        delete buf->base;
 
         if ((ret = uv_write(write_req, handle, &writebuf, 1, on_msg_write)) < 0)
         {
@@ -229,6 +229,11 @@ static void alloc_readbuffer_cb(uv_handle_t* handle,
 
         state->read_length = 0;
         state->parse_state = CLIENT_RECV_ALLOC_PAYLOAD;
+    }
+    else if (state->parse_state == CLIENT_RECV_ALLOC_PAYLOAD)
+    {
+        buf->base = state->req_buffer + state->read_length;
+        buf->len = state->req_buf_length - state->read_length;
     }
     else
     {
