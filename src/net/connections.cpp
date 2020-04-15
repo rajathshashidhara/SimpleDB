@@ -68,7 +68,7 @@ static void on_msg_write(uv_write_t* req, int status)
     if (status < 0)
     {
         LOG(ERROR) << "Write error: " << uv_strerror(status);
-        uv_tcp_close_reset((uv_tcp_t*) req->handle, on_close_connection);
+        uv_close((uv_handle_t*) req->handle, on_close_connection);
     }
 
     delete req;
@@ -112,7 +112,7 @@ static void on_msg_read(uv_stream_t* handle,
         else
         {
             LOG(ERROR) << "Read callback with nread=0";
-            uv_tcp_close_reset((uv_tcp_t*) handle, on_close_connection);
+            uv_close((uv_handle_t*) handle, on_close_connection);
         }
         return;
     }
@@ -120,7 +120,7 @@ static void on_msg_read(uv_stream_t* handle,
     if (nread < 0)
     {
         LOG(ERROR) << "Failed to read. Error: " << uv_strerror(nread);
-        uv_tcp_close_reset((uv_tcp_t*) handle, on_close_connection);
+        uv_close((uv_handle_t*) handle, on_close_connection);
 
         return;
     }
@@ -148,25 +148,25 @@ static void on_msg_read(uv_stream_t* handle,
         if (!req.ParseFromArray(state->req_buffer, state->req_buf_length))
         {
             LOG(ERROR) << "Failed to parse";
-            uv_tcp_close_reset((uv_tcp_t*) handle, on_close_connection);
+            uv_close((uv_handle_t*) handle, on_close_connection);
 
             return;
         }
         if (process_request(req, resp) < 0)
         {
             LOG(ERROR) << "Failed to proess request";
-            uv_tcp_close_reset((uv_tcp_t*) handle, on_close_connection);
+            uv_close((uv_handle_t*) handle, on_close_connection);
 
             return;
         }
         /* Send response back */
-        state->resp_buf_length = sizeof(size_t) + resp.ByteSizeLong();
+        state->resp_buf_length = sizeof(size_t) + resp.ByteSize();
         state->resp_buffer = new char[state->resp_buf_length];
-        *((size_t*) state->resp_buffer) = resp.ByteSizeLong();
-        if (!resp.SerializeToArray(state->resp_buffer + sizeof(size_t), resp.ByteSizeLong()))
+        *((size_t*) state->resp_buffer) = resp.ByteSize();
+        if (!resp.SerializeToArray(state->resp_buffer + sizeof(size_t), resp.ByteSize()))
         {
             LOG(ERROR) << "Failed to serialize response.";
-            uv_tcp_close_reset((uv_tcp_t*) handle, on_close_connection);
+            uv_close((uv_handle_t*) handle, on_close_connection);
             return;
         }
 
@@ -181,14 +181,14 @@ static void on_msg_read(uv_stream_t* handle,
         if ((ret = uv_write(write_req, handle, &writebuf, 1, on_msg_write)) < 0)
         {
             LOG(ERROR) << "Failed to send response. Error: " << uv_strerror(ret);
-            uv_tcp_close_reset((uv_tcp_t*) handle, on_close_connection);
+            uv_close((uv_handle_t*) handle, on_close_connection);
             return;
         }
     }
     else
     {
         LOG(ERROR) << "Parse state error";
-        uv_tcp_close_reset((uv_tcp_t*) handle, on_close_connection);
+        uv_close((uv_handle_t*) handle, on_close_connection);
     }
 }
 
@@ -219,7 +219,7 @@ static void alloc_readbuffer_cb(uv_handle_t* handle,
         if (state->req_buffer == nullptr)
         {
             LOG(ERROR) << "Cannot allocate recv memory buffers";
-            uv_tcp_close_reset((uv_tcp_t*) handle, on_close_connection);
+            uv_close((uv_handle_t*) handle, on_close_connection);
 
             return;
         }
@@ -238,7 +238,7 @@ static void alloc_readbuffer_cb(uv_handle_t* handle,
     else
     {
         LOG(ERROR) << "Invalid parse state: " << state->parse_state;
-        uv_tcp_close_reset((uv_tcp_t*) handle, on_close_connection);
+        uv_close((uv_handle_t*) handle, on_close_connection);
 
         return;
     }

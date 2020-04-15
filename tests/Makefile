@@ -3,7 +3,8 @@ DIR_SERVER := $(DIR)/../src
 DIR_LEVELDB := $(DIR)/../leveldb
 DIR_LIBUV := $(DIR)/../libuv
 
-CXX_SRCS := client.cpp
+CXX_SRCS := test_ops.cpp \
+			test_integrity.cpp
 
 CXX_OBJS := $(CXX_SRCS:.cpp=.o)
 CXX_DEPS := $(CXX_SRCS:.cpp=.d)
@@ -18,20 +19,20 @@ LDFLAGS := -L$(DIR_SERVER)/protobufs
 LDLIBS := -lformats $(PROTOBUF_LIBS)
 
 
-BIN := testclient.out
+BINS := $(CXX_SRCS:.cpp=.out)
 
 FORMATS_LIB := libformats.a
 
-all: $(FORMATS_LIB) $(BIN)
+all: $(FORMATS_LIB) $(BINS)
 
-$(BIN): $(CXX_OBJS)
+%.out: %.o
 	$(CXX) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
 $(FORMATS_LIB):
 	$(MAKE) -C $(DIR_SERVER)/protobufs
 
 clean:
-	rm -vf $(CXX_OBJS) $(CXX_DEPS) $(BIN)
+	rm -vf $(CXX_OBJS) $(CXX_DEPS) $(BINS)
 	$(MAKE) -C $(DIR_SERVER)/protobufs clean
 
 -include $(CXX_DEPS)

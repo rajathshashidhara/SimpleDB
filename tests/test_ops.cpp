@@ -62,7 +62,7 @@ int main(int argc, char* argv[])
 {
     GOOGLE_PROTOBUF_VERIFY_VERSION;
 
-    if (argc < 4)
+    if (argc < 3)
         return 1;
 
     std::string ip(argv[1]);
@@ -85,13 +85,12 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    std::string key = argv[3];
-    std::ifstream f(argv[3]);
-    std::string value((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+    std::string key = "Hello";
+    std::string value = "World!";
     KVRequest req;
     KVResponse resp;
-
     int id = 1;
+    
     /* Set */
     req.set_id(id++);
     req.set_op(OpType::SET);
@@ -107,36 +106,46 @@ int main(int argc, char* argv[])
 
     std::cout << "key=" << key << " return_code=" << resp.return_code() << std::endl;
 
-    while (1)
-    {
-        /* Get */
-        req.set_id(id++);
-        req.set_op(OpType::GET);
-        req.set_key(key);
-        req.set_val("");
-        req.set_immutable(false);
+    /* Get */
+    req.set_id(id++);
+    req.set_op(OpType::GET);
+    req.set_key(key);
+    req.set_val("");
+    req.set_immutable(false);
 
-        if (!send_request(fd, req))
-            return 1;
+    if (!send_request(fd, req))
+        return 1;
 
-        if (!receive_response(fd, resp))
-            return 1;
+    if (!receive_response(fd, resp))
+        return 1;
 
-        std::cout << "key=" << key << " return_code=" << resp.return_code() << " value_len=" << resp.val().length() << std::endl;
+    std::cout << "key=" << key << " return_code=" << resp.return_code() << " value=" << resp.val() << std::endl;
 
-        /* Delete */
-        // req.set_id(id++);
-        // req.set_op(OpType::DELETE);
-        // req.set_key(key);
+    /* Delete */
+    req.set_id(id++);
+    req.set_op(OpType::DELETE);
+    req.set_key(key);
 
-        // if (!send_request(fd, req))
-        //     return 1;
+    if (!send_request(fd, req))
+        return 1;
 
-        // if (!receive_response(fd, resp))
-        //     return 1;
+    if (!receive_response(fd, resp))
+        return 1;
 
-        // std::cout << "key=" << key << " return_code=" << resp.return_code() << std::endl;
-    }
+    std::cout << "key=" << key << " return_code=" << resp.return_code() << std::endl;
+
+    /* Failure Get */
+    req.set_id(id++);
+    req.set_op(OpType::GET);
+    req.set_key(key);
+
+    if (!send_request(fd, req))
+        return 1;
+
+    if (!receive_response(fd, resp))
+        return 1;
+
+    std::cout << "key=" << key << " return_code=" << resp.return_code() << " value=" << resp.val() << std::endl;
 
     google::protobuf::ShutdownProtobufLibrary();
     return 0;
