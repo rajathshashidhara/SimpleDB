@@ -15,7 +15,7 @@ PROTOBUF_LIBS := $(shell pkg-config --libs protobuf)
 CPPFLAGS := -I$(DIR_SERVER) \
 		-I$(DIR_LIBUV)/include
 
-CXXFLAGS := -g3 -Wall -Werror -MD -MP
+CXXFLAGS := -g3 -O2 -Wall -Werror -MD -MP
 
 LDFLAGS := -L$(DIR_SERVER)/protobufs \
 			-L$(DIR_LIBUV)/.libs
