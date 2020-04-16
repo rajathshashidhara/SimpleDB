@@ -235,6 +235,11 @@ static void alloc_readbuffer_cb(uv_handle_t* handle,
         buf->base = state->req_buffer + state->read_length;
         buf->len = state->req_buf_length - state->read_length;
     }
+    else if (state->parse_state == CLIENT_RECV_ALLOC_LEN)
+    {
+        buf->base = ((char*)&state->req_buf_length) + state->read_length;
+        buf->len = sizeof(state->req_buf_length) - state->read_length;
+    }
     else
     {
         LOG(ERROR) << "Invalid parse state: " << state->parse_state;
