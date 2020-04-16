@@ -66,6 +66,38 @@ static void on_msg_write(uv_write_t* req, int status)
     delete req;
 }
 
+static void on_handle_request(uv_work_t* req, int status)
+{
+    work_request* wr = (work_request*) req->data;
+    if (wr->err || status < 0)
+    {
+        LOG(ERROR) << "Handle request error: " << uv_strerror(status);
+        uv_close(wr->handle, on_close_connection);
+
+        if (wr->buffer != nullptr)
+            delete [] ((char*) wr->buffer);
+
+        delete wr;
+        delete req;
+
+        return;
+    }
+
+    uv_write_t* write_req = new uv_write_t();
+    uv_buf_t writebuf = uv_buf_init((char*) wr->buffer, wr->len);
+    write_req->data = wr->buffer;
+
+    int ret;
+    if ((ret = uv_write(write_req, (uv_stream_t*) wr->handle, &writebuf, 1, on_msg_write)) < 0)
+    {
+        LOG(ERROR) << "Failed to send response. Error: " << uv_strerror(ret);
+        uv_close(wr->handle, on_close_connection);
+    }
+
+    delete wr;
+    delete req;
+}
+
 static void on_msg_read(uv_stream_t* handle,
         ssize_t nread, const uv_buf_t* buf)
 {
@@ -136,51 +168,25 @@ static void on_msg_read(uv_stream_t* handle,
         state->parse_state = CLIENT_RECV_PAYLOAD;
         LOG(INFO) << "Received message: len=" << state->read_length;
 
-        KVRequest req;
-        KVResponse resp;
-        if (!req.ParseFromArray(state->req_buffer, state->req_buf_length))
-        {
-            LOG(ERROR) << "Failed to parse";
-            uv_close((uv_handle_t*) handle, on_close_connection);
+        uv_work_t* work_req = new uv_work_t();
+        work_request* work_meta = new work_request();
+        work_meta->handle = (uv_handle_t*) handle;
+        work_meta->buffer = state->req_buffer;
+        work_meta->len = state->req_buf_length;
+        work_meta->err = 0;
+        work_req->data = work_meta;
 
-            return;
-        }
-        if (process_request(req, resp) < 0)
-        {
-            LOG(ERROR) << "Failed to proess request";
-            uv_close((uv_handle_t*) handle, on_close_connection);
-
-            return;
-        }
-        /* Send response back */
-        size_t resp_buf_length = sizeof(size_t) + resp.ByteSize();
-        char* resp_buffer = new char[resp_buf_length];
-        if (resp_buffer == nullptr)
-        {
-            LOG(ERROR) << "Failed to allocate memory.";
-            uv_close((uv_handle_t*) handle, on_close_connection);
-            return;
-        }
-
-        *((size_t*) resp_buffer) = resp.ByteSize();
-        if (!resp.SerializeToArray(resp_buffer + sizeof(size_t), resp.ByteSize()))
-        {
-            LOG(ERROR) << "Failed to serialize response.";
-            uv_close((uv_handle_t*) handle, on_close_connection);
-            return;
-        }
-
-        uv_write_t* write_req = new uv_write_t();
-        uv_buf_t writebuf = uv_buf_init(resp_buffer, resp_buf_length);
-        write_req->data = resp_buffer;
-
-        delete [] state->req_buffer;
         state->req_buffer = nullptr;
         state->req_buf_length = state->alloc_length = state->read_length = 0;
 
-        if ((ret = uv_write(write_req, handle, &writebuf, 1, on_msg_write)) < 0)
+        if ((ret = uv_queue_work(uv_default_loop(), work_req, handle_request, on_handle_request)) < 0)
         {
-            LOG(ERROR) << "Failed to send response. Error: " << uv_strerror(ret);
+            LOG(ERROR) << "Failed to launch work handler. Error: " << uv_strerror(ret);
+
+            delete [] ((char*) work_meta->buffer);
+            delete work_req;
+            delete work_meta;
+
             uv_close((uv_handle_t*) handle, on_close_connection);
             return;
         }
