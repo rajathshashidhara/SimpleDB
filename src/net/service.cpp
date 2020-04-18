@@ -10,18 +10,18 @@ int process_request(const KVRequest& request,
     std::string value;
     int ret;
 
-    switch (request.op())
+    switch (request.ReqOps_case())
     {
-    case OpType::GET:
-        ret = simpledb::db::get(request.key(), value);
+    case KVRequest::ReqOpsCase::kGetRequest:
+        ret = simpledb::db::get(request.get_request().key(), value);
         break;
 
-    case OpType::SET:
-        ret = simpledb::db::set(request.key(), request.val(),
-                request.immutable());
+    case KVRequest::ReqOpsCase::kPutRequest:
+        ret = simpledb::db::set(request.put_request().key(),
+                request.put_request().val(), request.put_request().immutable());
         break;
-    case OpType::DELETE:
-        ret = simpledb::db::remove(request.key());
+    case KVRequest::ReqOpsCase::kDeleteRequest:
+        ret = simpledb::db::remove(request.delete_request().key());
         break;
     default:
         return -1;

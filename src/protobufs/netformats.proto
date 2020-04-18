@@ -2,18 +2,44 @@ syntax  = "proto3";
 
 package simpledb.proto;
 
-enum OpType {
-    GET = 0;
-    SET = 1;
-    DELETE = 2;
+message GetRequest {
+    bytes key = 1;
+};
+
+message PutRequest {
+    bytes key = 1;
+    bytes val = 2;
+    bool immutable = 3;
+};
+
+message DeleteRequest {
+    bytes key = 1;
+};
+
+message RegisterRequest {
+    bytes key = 1;  /* Function name */
+    bytes val = 2;  /* Code provided as binary string */
+    uint32 required_args = 3;    /* Number of arguments */
+    bool optional_args = 4;     /* Whether additional arguments may be supplied (no limit) */
+};
+
+message ExecRequest {
+    bytes func = 1; /* Function name */
+    repeated bytes immediate_input = 2; /* Immediate values as input */
+    repeated bytes input_keys = 3;  /* Input keys */
+    bool put_output = 4;
+    bytes output_key = 5;       /* Only required for ExecPut */
 };
 
 message KVRequest {
     uint64 id = 1;
-    OpType op = 2;
-    bytes key = 3;
-    bytes val = 4;
-    bool immutable = 5;
+    oneof ReqOps {
+        GetRequest get_request = 2;
+        PutRequest put_request = 3;
+        DeleteRequest delete_request = 4;
+        RegisterRequest register_request = 5;
+        ExecRequest exec_request = 6;
+    };
 };
 
 message KVResponse {

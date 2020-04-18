@@ -97,11 +97,11 @@ int main(int argc, char* argv[])
 
     int id = 1;
     /* Set */
+    PutRequest* set_req = req.mutable_put_request();
     req.set_id(id++);
-    req.set_op(OpType::SET);
-    req.set_key(key);
-    req.set_val(value);
-    req.set_immutable(true);
+    set_req->set_key(key);
+    set_req->set_val(value);
+    set_req->set_immutable(true);
 
     if (!send_request(fd, req))
         return 1;
@@ -111,11 +111,9 @@ int main(int argc, char* argv[])
 
     std::cout << "key=" << key << " return_code=" << resp.return_code() << std::endl;
 
+    GetRequest* get_req = req.mutable_get_request();
     req.set_id(id++);
-    req.set_op(OpType::GET);
-    req.set_key(key);
-    req.set_val("");
-    req.set_immutable(false);
+    get_req->set_key(key);
 
     if (!send_request(fd, req))
         return 1;

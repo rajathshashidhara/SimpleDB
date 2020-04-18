@@ -144,9 +144,9 @@ static void on_read(uv_stream_t* handle,
         state->compl_req += 1;
         state->reqs.erase(resp.id());
 
-        req.set_op(OpType::GET);
-        req.set_key(state->keys[resp.id() % state->pipelined]);
         req.set_id(state->op_id++);
+        GetRequest* get_req = req.mutable_get_request();
+        get_req->set_key(state->keys[resp.id() % state->pipelined]);
 
         delete [] state->resp_buf;
         state->resp_buf = nullptr;
@@ -238,10 +238,10 @@ static void on_connect(uv_connect_t* connect, int status)
     {
         KVRequest req;
         req.set_id(params->op_id++);
-        req.set_immutable(true);
-        req.set_key(params->keys[i]);
-        req.set_val(params->val);
-        req.set_op(OpType::SET);
+        PutRequest* put_req = req.mutable_put_request();
+        put_req->set_immutable(true);
+        put_req->set_key(params->keys[i]);
+        put_req->set_val(params->val);
 
         char* req_buf = new char[sizeof(size_t) + req.ByteSize()];
         if (!req.SerializeToArray(req_buf + sizeof(size_t), req.ByteSize()))
