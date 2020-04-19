@@ -3,7 +3,9 @@ CXX_FLAGS := -O2 -g3 -Wall -Werror
 
 LIB := libformats.a
 
-PRSRCS := $(wildcard *.proto)
+PRSRCS := netformats.proto \
+			serialization.proto \
+			execformats.proto
 PRCPPS := $(PRSRCS:.proto=.pb.cc)
 PRINCS := $(PRSRCS:.proto=.pb.h)
 PROBJS := $(PRSRCS:.proto=.pb.o)

@@ -4,7 +4,23 @@
 #include "db/db.h"
 #include "net/service.h"
 
-int process_request(const KVRequest& request,
+#include "protobufs/serialization.pb.h"
+
+static int process_register_request(const RegisterRequest& reg_request)
+{
+    FunctionMetadata function;
+    std::string serializedfunc;
+
+    function.set_binary(reg_request.func_binary());
+    function.set_runtime(reg_request.runtime());
+    function.set_list_args(reg_request.list_args());
+    function.set_dict_args(reg_request.dict_args());
+
+    serializedfunc = function.SerializeAsString();
+    return simpledb::db::set(reg_request.func_name(), serializedfunc, true);
+}
+
+static int process_request(const KVRequest& request,
                     KVResponse& response)
 {
     std::string value;
@@ -20,9 +36,15 @@ int process_request(const KVRequest& request,
         ret = simpledb::db::set(request.put_request().key(),
                 request.put_request().val(), request.put_request().immutable());
         break;
+
     case KVRequest::ReqOpsCase::kDeleteRequest:
         ret = simpledb::db::remove(request.delete_request().key());
         break;
+    
+    case KVRequest::ReqOpsCase::kRegisterRequest:
+        ret = process_register_request(request.register_request());
+        break;
+
     default:
         return -1;
     }

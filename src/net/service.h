@@ -19,8 +19,6 @@ struct work_request
     int             err;
 };
 
-int process_request(const KVRequest& request,
-                    KVResponse& response);
 void handle_request(uv_work_t* wq);
 
 #endif /* SIMPLEDB_NET_SERVICE */

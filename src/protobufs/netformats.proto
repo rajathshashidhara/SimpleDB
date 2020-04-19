@@ -1,5 +1,4 @@
 syntax  = "proto3";
-
 package simpledb.proto;
 
 message GetRequest {
@@ -16,17 +15,36 @@ message DeleteRequest {
     bytes key = 1;
 };
 
+enum LambdaRuntime {
+    CPP = 0;
+    PYTHON3 = 1;
+    JAVASCRIPT = 2;
+    WEBASSEMBLY = 3;
+};
+
 message RegisterRequest {
-    bytes key = 1;  /* Function name */
-    bytes val = 2;  /* Code provided as binary string */
-    uint32 required_args = 3;    /* Number of arguments */
-    bool optional_args = 4;     /* Whether additional arguments may be supplied (no limit) */
+    string func_name = 1;    /* Function name */
+    bytes func_binary = 2;  /* Code provided as binary string */
+    LambdaRuntime runtime = 3; /* Runtime for lambda */
+    bool list_args = 4;         /* Arguments provided as list */
+    bool dict_args = 5;         /* Arguments provided as dict */
+};
+
+message ExecListArg {
+    bool immediate = 1;
+    bytes key = 2;
+};
+
+message ExecDictArg {
+    bool immediate = 1;
+    bytes key = 2;
+    bytes val = 3;
 };
 
 message ExecRequest {
     bytes func = 1; /* Function name */
-    repeated bytes immediate_input = 2; /* Immediate values as input */
-    repeated bytes input_keys = 3;  /* Input keys */
+    repeated ExecListArg list_args = 2;
+    repeated ExecDictArg dict_args = 3;
     bool put_output = 4;
     bytes output_key = 5;       /* Only required for ExecPut */
 };

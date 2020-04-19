@@ -62,7 +62,7 @@ int main(int argc, char* argv[])
 {
     GOOGLE_PROTOBUF_VERIFY_VERSION;
 
-    if (argc < 3)
+    if (argc < 4)
         return 1;
 
     std::string ip(argv[1]);
@@ -144,6 +144,24 @@ int main(int argc, char* argv[])
         return 1;
 
     std::cout << "key=" << key << " return_code=" << resp.return_code() << " value=" << resp.val() << std::endl;
+
+    /* Register */
+    RegisterRequest* reg_req = req.mutable_register_request();
+    req.set_id(id++);
+    reg_req->set_func_name("fibonacci()");
+    std::ifstream t(argv[3]);
+    std::string code((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
+    reg_req->set_func_binary(std::move(code));
+    reg_req->set_runtime(LambdaRuntime::CPP);
+    reg_req->set_list_args(true);
+    reg_req->set_dict_args(false);
+
+    if (!send_request(fd, req))
+        return 1;
+    
+    if (!receive_response(fd, resp))
+        return 1;
+    std::cout << "return_code=" << resp.return_code() << std::endl;
 
     google::protobuf::ShutdownProtobufLibrary();
     return 0;

@@ -1,0 +1,19 @@
+syntax  = "proto3";
+package simpledb.proto;
+
+import "netformats.proto";
+
+message DictArg {
+    string key = 1;
+    bytes val = 2;
+};
+
+message CPPExecArgs {
+    repeated bytes args = 1;
+    repeated DictArg kwargs = 2;
+};
+
+message CPPExecResponse {
+    int32 return_code = 1;
+    bytes output = 2;
+};

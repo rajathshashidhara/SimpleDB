@@ -1,8 +1,16 @@
 syntax  = "proto3";
-
 package simpledb.proto;
+
+import "netformats.proto";
 
 message FileMetadata {
     bool immutable = 1;
     bytes content = 2;
+};
+
+message FunctionMetadata {
+    bytes binary = 1;
+    LambdaRuntime runtime = 2;  /* Runtime for lambda */
+    bool list_args = 3;         /* Arguments provided as list */
+    bool dict_args = 4;         /* Arguments provided as dict */
 };
