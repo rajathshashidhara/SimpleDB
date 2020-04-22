@@ -31,6 +31,28 @@ struct client_state_t
     size_t alloc_length;
 };
 
+static void on_close_connection(uv_handle_t* handle);
+static void on_shutdown(uv_shutdown_t* req, int status);
+static void on_msg_write(uv_write_t* req, int status);
+static void on_close_pipe(uv_handle_t* pipe_handle);
+static void on_handle_request(uv_work_t* req, int status);
+static void on_exec_compl(uv_process_t* process, int64_t exit_status, int term_signal);
+static void on_pipe_read(uv_stream_t* handle,
+        ssize_t nread, const uv_buf_t* buf);
+static void alloc_piperead_cb(uv_handle_t* handle,
+                                size_t suggested_size,
+                                uv_buf_t* buf);
+static void on_exec_write_compl(uv_write_t* req, int status);
+static void on_fsexec_close(uv_fs_t* req);
+static void on_fsexec_write(uv_fs_t* req);
+static void on_fsexec_open(uv_fs_t* req);
+static void on_msg_read(uv_stream_t* handle,
+        ssize_t nread, const uv_buf_t* buf);
+static void alloc_readbuffer_cb(uv_handle_t* handle,
+                                size_t suggested_size,
+                                uv_buf_t* buf);
+static void on_new_connection(uv_stream_t *server, int status);
+
 static void on_close_connection(uv_handle_t* handle)
 {
     uv_stream_t* stream = (uv_stream_t*) handle;
@@ -72,6 +94,58 @@ static void on_close_pipe(uv_handle_t* pipe_handle)
     /* Do nothing */
 }
 
+static void on_handle_request(uv_work_t* req, int status)
+{
+    int ret;
+    work_request* wr = (work_request*) req->data;
+    delete req;
+
+    if (((wr->flags & WORK_ERROR) == WORK_ERROR) || status < 0)
+    {
+        LOG(ERROR) << "Handle request error: " << uv_strerror(status);
+        uv_close(wr->handle, on_close_connection);
+
+        if (wr->buffer != nullptr)
+            delete [] ((char*) wr->buffer);
+
+        delete wr;
+        return;
+    }
+
+    if ((wr->flags & WORK_EXEC) == WORK_EXEC)
+    {
+
+        ExecCmd* cmd = (ExecCmd*) wr->buffer;
+        uv_fs_t* open_req = new uv_fs_t();
+        open_req->data = (void*) wr;
+
+        if ((ret = uv_fs_open(uv_default_loop(), open_req,
+            cmd->func_name.c_str(), O_CREAT | O_TRUNC | O_RDWR, S_IRWXU | S_IRWXG | S_IRWXO, on_fsexec_open)) < 0)
+        {
+            LOG(ERROR) << "Unable to open file: " << uv_strerror(ret);
+            uv_close(wr->handle, on_close_connection);
+
+            uv_fs_req_cleanup(open_req);
+            delete wr;
+            delete cmd;
+        }
+
+        return;
+    }
+
+    uv_write_t* write_req = new uv_write_t();
+    uv_buf_t writebuf = uv_buf_init((char*) wr->buffer, wr->len);
+    write_req->data = wr->buffer;
+
+    if ((ret = uv_write(write_req, (uv_stream_t*) wr->handle, &writebuf, 1, on_msg_write)) < 0)
+    {
+        LOG(ERROR) << "Failed to send response. Error: " << uv_strerror(ret);
+        uv_close(wr->handle, on_close_connection);
+    }
+
+    delete wr;
+}
+
 static void on_exec_compl(uv_process_t* process, int64_t exit_status, int term_signal)
 {
     work_request* wr = (work_request*) process->data;
@@ -89,70 +163,24 @@ static void on_exec_compl(uv_process_t* process, int64_t exit_status, int term_s
         return;
     }
 
-    CPPExecResponse exec_resp;
-    if (!exec_resp.ParseFromString(cmd->output))
+    uv_work_t* work_req = new uv_work_t();
+    work_req->data = wr;
+    wr->flags = 0;
+
+    if ((ret = uv_queue_work(uv_default_loop(), work_req, handle_exec_compl, on_handle_request)) < 0)
     {
-        LOG(ERROR) << "Failed to parse output";
+        LOG(ERROR) << "Failed to launch work handler. Error: " << uv_strerror(ret);
+        uv_close((uv_handle_t*) wr->handle, on_close_connection);
 
-        uv_close(wr->handle, on_close_connection);
-
+        delete work_req;
         delete cmd;
         delete wr;
 
         return;
-    }
-
-    if (cmd->put_output)
-    {
-        ret = simpledb::db::set(cmd->output_key, exec_resp.output(), true);
-        if (ret < 0)
-        {
-            LOG(ERROR) << "Unable to write output to DB";
-            uv_close(wr->handle, on_close_connection);
-
-            delete cmd;
-            delete wr;
-
-            return;
-        }
     }
 
     uv_close((uv_handle_t*) &wr->input_pipe, on_close_pipe);
     uv_close((uv_handle_t*) &wr->output_pipe, on_close_pipe);
-
-    KVResponse resp;
-    resp.set_id(cmd->id);
-    resp.set_return_code(exec_resp.return_code());
-    if (!cmd->put_output)
-    {
-        resp.set_val(exec_resp.output());
-    }
-    wr->buffer = new char[sizeof(size_t) + resp.ByteSize()];
-    wr->len = sizeof(size_t) + resp.ByteSize();
-    *((size_t*) wr->buffer) = resp.ByteSize();
-    if (!resp.SerializeToArray((char*) wr->buffer + sizeof(size_t), resp.ByteSize()))
-    {
-        LOG(ERROR) << "Unable to serialize response";
-        uv_close(wr->handle, on_close_connection);
-
-        delete cmd;
-        delete wr;
-
-        return;
-    }
-
-    uv_write_t* write_req = new uv_write_t();
-    uv_buf_t writebuf = uv_buf_init((char*) wr->buffer, wr->len);
-    write_req->data = wr->buffer;
-
-    if ((ret = uv_write(write_req, (uv_stream_t*) wr->handle, &writebuf, 1, on_msg_write)) < 0)
-    {
-        LOG(ERROR) << "Failed to send response. Error: " << uv_strerror(ret);
-        uv_close(wr->handle, on_close_connection);
-    }
-
-    delete cmd;
-    delete wr;
 }
 
 static void on_pipe_read(uv_stream_t* handle,
@@ -357,58 +385,6 @@ static void on_fsexec_open(uv_fs_t* req)
         delete wr;
         uv_fs_req_cleanup(write_req);
     }
-}
-
-static void on_handle_request(uv_work_t* req, int status)
-{
-    int ret;
-    work_request* wr = (work_request*) req->data;
-    delete req;
-
-    if (((wr->flags & WORK_ERROR) == WORK_ERROR) || status < 0)
-    {
-        LOG(ERROR) << "Handle request error: " << uv_strerror(status);
-        uv_close(wr->handle, on_close_connection);
-
-        if (wr->buffer != nullptr)
-            delete [] ((char*) wr->buffer);
-
-        delete wr;
-        return;
-    }
-
-    if ((wr->flags & WORK_EXEC) == WORK_EXEC)
-    {
-
-        ExecCmd* cmd = (ExecCmd*) wr->buffer;
-        uv_fs_t* open_req = new uv_fs_t();
-        open_req->data = (void*) wr;
-
-        if ((ret = uv_fs_open(uv_default_loop(), open_req,
-            cmd->func_name.c_str(), O_CREAT | O_TRUNC | O_RDWR, S_IRWXU | S_IRWXG | S_IRWXO, on_fsexec_open)) < 0)
-        {
-            LOG(ERROR) << "Unable to open file: " << uv_strerror(ret);
-            uv_close(wr->handle, on_close_connection);
-
-            uv_fs_req_cleanup(open_req);
-            delete wr;
-            delete cmd;
-        }
-
-        return;
-    }
-
-    uv_write_t* write_req = new uv_write_t();
-    uv_buf_t writebuf = uv_buf_init((char*) wr->buffer, wr->len);
-    write_req->data = wr->buffer;
-
-    if ((ret = uv_write(write_req, (uv_stream_t*) wr->handle, &writebuf, 1, on_msg_write)) < 0)
-    {
-        LOG(ERROR) << "Failed to send response. Error: " << uv_strerror(ret);
-        uv_close(wr->handle, on_close_connection);
-    }
-
-    delete wr;
 }
 
 static void on_msg_read(uv_stream_t* handle,

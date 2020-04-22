@@ -139,6 +139,53 @@ static int process_kv_request(const KVRequest& request,
     return 0;
 }
 
+void handle_exec_compl(uv_work_t* wq)
+{
+    work_request* wr = (work_request*) wq->data;
+    ExecCmd* cmd = (ExecCmd*) wr->buffer;
+    CPPExecResponse exec_resp;
+    KVResponse resp;
+
+    if (!exec_resp.ParseFromString(cmd->output))
+    {
+        LOG(ERROR) << "Failed to parse output";
+        goto ERROR_HANDLE_EXEC;
+    }
+
+    resp.set_id(cmd->id);
+    resp.set_return_code(exec_resp.return_code());
+    if (cmd->put_output)
+    {
+        if (simpledb::db::set(cmd->output_key, exec_resp.output(), true) < 0)
+        {
+            LOG(ERROR) << "Unable to write output to DB";
+            goto ERROR_HANDLE_EXEC;
+        }
+    }
+    else
+        resp.set_val(exec_resp.output());
+
+    delete cmd;
+    wr->buffer = new char[sizeof(size_t) + resp.ByteSize()];
+    wr->len = sizeof(size_t) + resp.ByteSize();
+    *((size_t*) wr->buffer) = resp.ByteSize();
+
+    if (!resp.SerializeToArray((char*) wr->buffer + sizeof(size_t), resp.ByteSize()))
+    {
+        LOG(ERROR) << "Unable to serialize response";
+        goto ERROR_HANDLE_EXEC;
+    }
+
+    return;
+
+ERROR_HANDLE_EXEC:
+    wr->flags |= WORK_ERROR;
+    wr->buffer = nullptr;
+    wr->len = 0;
+
+    return;
+}
+
 void handle_request(uv_work_t* wq)
 {
     work_request* wreq = (work_request*) wq->data;

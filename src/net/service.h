@@ -46,5 +46,6 @@ struct ExecCmd
 };
 
 void handle_request(uv_work_t* wq);
+void handle_exec_compl(uv_work_t* wq);
 
 #endif /* SIMPLEDB_NET_SERVICE */
