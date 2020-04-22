@@ -90,7 +90,7 @@ int main(int argc, char* argv[])
     KVRequest req;
     KVResponse resp;
     int id = 1;
-    
+
     /* Set */
     PutRequest* set_req = req.mutable_put_request();
     req.set_id(id++);
@@ -148,7 +148,7 @@ int main(int argc, char* argv[])
     /* Register */
     RegisterRequest* reg_req = req.mutable_register_request();
     req.set_id(id++);
-    reg_req->set_func_name("fibonacci()");
+    reg_req->set_func_name(argv[3]);
     std::ifstream t(argv[3]);
     std::string code((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
     reg_req->set_func_binary(std::move(code));
@@ -158,10 +158,73 @@ int main(int argc, char* argv[])
 
     if (!send_request(fd, req))
         return 1;
-    
+
     if (!receive_response(fd, resp))
         return 1;
     std::cout << "return_code=" << resp.return_code() << std::endl;
+
+    /* Exec - Immediate */
+    ExecRequest* exec_req = req.mutable_exec_request();
+    req.set_id(id++);
+    exec_req->set_func(argv[3]);
+    exec_req->set_put_output(true);
+    exec_req->set_output_key("2");
+    auto args = exec_req->mutable_list_args();
+    ExecListArg *arg_1 = args->Add();
+    arg_1->set_immediate(true);
+    arg_1->set_key(std::to_string(1));
+    ExecListArg *arg_2 = args->Add();
+    arg_2->set_immediate(true);
+    arg_2->set_key(std::to_string(1));
+
+    if (!send_request(fd, req))
+        return 1;
+
+    if (!receive_response(fd, resp))
+        return 1;
+    std::cout << "value="<< resp.val() << " return_code=" << resp.return_code() << std::endl;
+
+    exec_req = req.mutable_exec_request();
+    req.set_id(id++);
+    exec_req->set_func(argv[3]);
+    exec_req->set_put_output(true);
+    exec_req->set_output_key("3");
+    exec_req->clear_list_args();
+    args = exec_req->mutable_list_args();
+    arg_1 = args->Add();
+    arg_1->set_immediate(true);
+    arg_1->set_key(std::to_string(1));
+    arg_2 = args->Add();
+    arg_2->set_immediate(false);
+    arg_2->set_key(std::to_string(2));
+
+    if (!send_request(fd, req))
+        return 1;
+
+    if (!receive_response(fd, resp))
+        return 1;
+    std::cout << "value="<< resp.val() << " return_code=" << resp.return_code() << std::endl;
+
+    exec_req = req.mutable_exec_request();
+    req.set_id(id++);
+    exec_req->set_func(argv[3]);
+    exec_req->set_put_output(false);
+    exec_req->clear_output_key();
+    exec_req->clear_list_args();
+    args = exec_req->mutable_list_args();
+    arg_1 = args->Add();
+    arg_1->set_immediate(false);
+    arg_1->set_key(std::to_string(2));
+    arg_2 = args->Add();
+    arg_2->set_immediate(false);
+    arg_2->set_key(std::to_string(3));
+
+    if (!send_request(fd, req))
+        return 1;
+
+    if (!receive_response(fd, resp))
+        return 1;
+    std::cout << "value="<< resp.val() << " return_code=" << resp.return_code() << std::endl;
 
     google::protobuf::ShutdownProtobufLibrary();
     return 0;

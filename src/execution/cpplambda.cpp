@@ -5,9 +5,14 @@ static int parse_args(std::vector<std::string>& args,
             std::unordered_map<std::string, std::string>& kwargs)
 {
     simpledb::proto::CPPExecArgs exec_args;
-    if (!exec_args.ParseFromIstream(&std::cin))
+    size_t len;
+    std::cin.read((char*) &len, sizeof(size_t));
+    std::string buf(len, 0);
+    std::cin.read(&buf[0], len);
+
+    if (!exec_args.ParseFromString(buf))
         return -1;
-    
+
     for (auto it = exec_args.args().begin(); 
             it != exec_args.args().end(); ++it)
     {
@@ -45,7 +50,7 @@ int main(int argc, char* argv[])
         return PARSE_FAILURE_CODE;
 
     int ret = lambda_exec(args, kwargs, output);
-    
+
     if (return_output(ret, output) < 0)
         return OUTPUT_FAILURE_CODE;
     

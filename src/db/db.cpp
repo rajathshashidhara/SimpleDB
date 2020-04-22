@@ -12,6 +12,11 @@ namespace simpledb::db
     static leveldb::DB *db;
 };
 
+extern "C" {
+    #include "config.h"
+    #include <sys/stat.h>
+}
+
 int simpledb::db::init(std::string path, bool create, size_t cache_size)
 {
     leveldb::Options options;
@@ -20,6 +25,12 @@ int simpledb::db::init(std::string path, bool create, size_t cache_size)
 
     leveldb::Status status = leveldb::DB::Open(options, path, &db);
     if (!status.ok())
+    {
+        LOG(FATAL) << "Cannot create database. Error: " << status.ToString();
+        return -1;
+    }
+
+    if (mkdir(DEFAULT_EXEC_PATH, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH) < 0)
     {
         LOG(FATAL) << "Cannot create database. Error: " << status.ToString();
         return -1;

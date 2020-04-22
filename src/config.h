@@ -7,4 +7,6 @@
 #define DEFAULT_DB_PATH                 "/tmp/simpledb"
 #define DEFAULT_DB_CACHE_SIZE           128 * 1024 * 1024   /* 128 MB */
 
+#define DEFAULT_EXEC_PATH               DEFAULT_DB_PATH "/exec"
+
 #endif /* SIMPLEDB_CONFIG */
