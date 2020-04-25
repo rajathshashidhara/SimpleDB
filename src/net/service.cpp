@@ -53,21 +53,74 @@ static int process_exec_request(const ExecRequest& request,
     for (auto &arg: request.list_args())
     {
         std::string val;
-        if (arg.immediate())
+        std::string path;
+
+        auto larg = args->Add();
+        switch (arg.type())
         {
-            val = arg.key();
-        }
-        else
-        {
-            ret = simpledb::db::get(arg.key(), val);
-            if (ret < 0)
-            {
+            case ArgType::IMMEDIATE:
+                val = arg.key();
+                larg->set_val(val);
+                break;
+
+            case ArgType::BYTESTRING:
+                ret = simpledb::db::get(arg.key(), val);
+                if (ret < 0)
+                {
+                    LOG(ERROR) << "Unable to fetch argument: " << arg.key();
+                    return -EXEC_STATUS_ARGS_INVALID;
+                }
+                larg->set_val(val);
+                break;
+
+            case ArgType::FILE:
+                path = std::string(DEFAULT_CACHE_PATH "/");
+                path.append(arg.key());
+
+                ret = access(path.c_str(), O_RDONLY);
+                if (ret < 0)
+                {
+                    LOG(WARNING) << "File " << arg.key() << " does not exist in cache: " << strerror(errno);
+
+                    ret = simpledb::db::get(arg.key(), val);
+                    if (ret < 0)
+                    {
+                        LOG(ERROR) << "Unable to fetch argument: " << arg.key();
+                        return -EXEC_STATUS_ARGS_INVALID;
+                    }
+
+                    /* Create file */
+                    int fd = open(path.c_str(), O_RDWR | O_CREAT, S_IRWXU | S_IRGRP | S_IXGRP);
+
+                    if (fd < 0)
+                    {
+                        LOG(ERROR) << "Unable to open argument file: " << strerror(errno);
+                        return -EXEC_STATUS_ERR;
+                    }
+
+                    ssize_t write_len;
+                    size_t total_write_len = 0;
+                    while (total_write_len < val.length())
+                    {
+                        write_len = write(fd, val.c_str() + total_write_len, val.length() - total_write_len);
+                        if (write_len < 0)
+                        {
+                            LOG(ERROR) << "Failed to create CACHE file: " << strerror(errno);
+                            return -EXEC_STATUS_ERR;
+                        }
+
+                        total_write_len += write_len;
+                    }
+                }
+
+                larg->set_val(path);
+                larg->set_is_file(true);
+                break;
+
+            default:
                 LOG(ERROR) << "Unable to fetch argument: " << arg.key();
                 return -EXEC_STATUS_ARGS_INVALID;
-            }
         }
-
-        args->Add(std::move(val));
     }
 
     auto kwargs = eargs.mutable_kwargs();
@@ -75,18 +128,69 @@ static int process_exec_request(const ExecRequest& request,
     {
         DictArg* new_arg = kwargs->Add();
         std::string val;
-        if (kwarg.immediate())
+        std::string path;
+
+        switch (kwarg.type())
         {
-            val = kwarg.val();
-        }
-        else
-        {
-            ret = simpledb::db::get(kwarg.key(), val);
-            if (ret < 0)
-            {
+            case ArgType::IMMEDIATE:
+                val = kwarg.val();
+                break;
+
+            case ArgType::BYTESTRING:
+                ret = simpledb::db::get(kwarg.key(), val);
+                if (ret < 0)
+                {
+                    LOG(ERROR) << "Unable to fetch argument: " << kwarg.key();
+                    return -EXEC_STATUS_ARGS_INVALID;
+                }
+                break;
+
+            case ArgType::FILE:
+                path = std::string(DEFAULT_CACHE_PATH "/");
+                path.append(kwarg.key());
+
+                ret = access(path.c_str(), O_RDONLY);
+                if (ret < 0)
+                {
+                    LOG(WARNING) << "File " << kwarg.key() << " does not exist in cache: " << strerror(errno);
+
+                    ret = simpledb::db::get(kwarg.key(), val);
+                    if (ret < 0)
+                    {
+                        LOG(ERROR) << "Unable to fetch argument: " << kwarg.key();
+                        return -EXEC_STATUS_ARGS_INVALID;
+                    }
+
+                    /* Create file */
+                    int fd = open(path.c_str(), O_RDWR | O_CREAT, S_IRWXU | S_IRGRP | S_IXGRP);
+
+                    if (fd < 0)
+                    {
+                        LOG(ERROR) << "Unable to open argument file: " << strerror(errno);
+                        return -EXEC_STATUS_ERR;
+                    }
+
+                    ssize_t write_len;
+                    size_t total_write_len = 0;
+                    while (total_write_len < val.length())
+                    {
+                        write_len = write(fd, val.c_str() + total_write_len, val.length() - total_write_len);
+                        if (write_len < 0)
+                        {
+                            LOG(ERROR) << "Failed to create CACHE file: " << strerror(errno);
+                            return -EXEC_STATUS_ERR;
+                        }
+
+                        total_write_len += write_len;
+                    }
+                }
+
+                val = std::move(path);
+                new_arg->set_is_file(true);
+                break;
+            default:
                 LOG(ERROR) << "Unable to fetch argument: " << kwarg.key();
                 return -EXEC_STATUS_ARGS_INVALID;
-            }
         }
 
         new_arg->set_key(kwarg.key());

@@ -171,10 +171,10 @@ int main(int argc, char* argv[])
     exec_req->set_output_key("2");
     auto args = exec_req->mutable_list_args();
     ExecListArg *arg_1 = args->Add();
-    arg_1->set_immediate(true);
+    arg_1->set_type(ArgType::IMMEDIATE);
     arg_1->set_key(std::to_string(1));
     ExecListArg *arg_2 = args->Add();
-    arg_2->set_immediate(true);
+    arg_2->set_type(ArgType::IMMEDIATE);
     arg_2->set_key(std::to_string(1));
 
     if (!send_request(fd, req))
@@ -192,10 +192,10 @@ int main(int argc, char* argv[])
     exec_req->clear_list_args();
     args = exec_req->mutable_list_args();
     arg_1 = args->Add();
-    arg_1->set_immediate(true);
+    arg_1->set_type(ArgType::IMMEDIATE);
     arg_1->set_key(std::to_string(1));
     arg_2 = args->Add();
-    arg_2->set_immediate(false);
+    arg_2->set_type(ArgType::BYTESTRING);
     arg_2->set_key(std::to_string(2));
 
     if (!send_request(fd, req))
@@ -213,10 +213,10 @@ int main(int argc, char* argv[])
     exec_req->clear_list_args();
     args = exec_req->mutable_list_args();
     arg_1 = args->Add();
-    arg_1->set_immediate(false);
+    arg_1->set_type(ArgType::BYTESTRING);
     arg_1->set_key(std::to_string(2));
     arg_2 = args->Add();
-    arg_2->set_immediate(false);
+    arg_2->set_type(ArgType::BYTESTRING);
     arg_2->set_key(std::to_string(3));
 
     if (!send_request(fd, req))

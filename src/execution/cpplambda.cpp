@@ -1,8 +1,8 @@
 #include "execution/cpplambda.h"
 #include "protobufs/execformats.pb.h"
 
-static int parse_args(std::vector<std::string>& args,
-            std::unordered_map<std::string, std::string>& kwargs)
+static int parse_args(std::vector<std::pair<bool, std::string> >& args,
+            std::unordered_map<std::string, std::pair<bool, std::string> >& kwargs)
 {
     simpledb::proto::CPPExecArgs exec_args;
     size_t len;
@@ -16,13 +16,13 @@ static int parse_args(std::vector<std::string>& args,
     for (auto it = exec_args.args().begin(); 
             it != exec_args.args().end(); ++it)
     {
-        args.push_back(*it);
+        args.push_back(std::make_pair(it->is_file(), it->val()));
     }
 
     for (auto it = exec_args.kwargs().begin();
             it != exec_args.kwargs().end(); ++it)
     {
-        kwargs.insert(std::pair<std::string, std::string>(it->key(), it->val()));
+        kwargs.insert(std::make_pair(it->key(), std::make_pair(it->is_file(), it->val())));
     }
 
     return 0;
@@ -42,8 +42,8 @@ int return_output(int return_code, std::string& output)
 
 int main(int argc, char* argv[])
 {
-    std::vector<std::string> args;
-    std::unordered_map<std::string, std::string> kwargs;
+    std::vector<std::pair<bool, std::string> > args;
+    std::unordered_map<std::string, std::pair<bool, std::string> > kwargs;
     std::string output;
 
     if (parse_args(args, kwargs) < 0)

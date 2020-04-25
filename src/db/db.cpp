@@ -15,6 +15,8 @@ namespace simpledb::db
 extern "C" {
     #include "config.h"
     #include <sys/stat.h>
+    #include <unistd.h>
+    #include <errno.h>
 }
 
 int simpledb::db::init(std::string path, bool create, size_t cache_size)
@@ -89,6 +91,10 @@ int simpledb::db::set(const std::string key, const std::string value, const bool
             LOG(ERROR) << "Set Key=" << key << " Error: Cannot modify immutable file";
             return -STATUS_IMMUTABLE;
         }
+
+        std::string cache_path(DEFAULT_CACHE_PATH "/");
+        cache_path.append(key);
+        unlink(cache_path.c_str());
     }
 
     file.set_immutable(immutable);

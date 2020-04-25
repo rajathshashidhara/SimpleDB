@@ -9,8 +9,8 @@
 #define PARSE_FAILURE_CODE 0xdeadbeef
 #define OUTPUT_FAILURE_CODE 0xbeefdead
 
-extern int lambda_exec(std::vector<std::string>& args,
-        std::unordered_map<std::string, std::string>& kwargs,
+extern int lambda_exec(std::vector<std::pair<bool, std::string> >& args,
+        std::unordered_map<std::string, std::pair<bool, std::string> >& kwargs,
         std::string& output);
 
 #endif /* SIMPLEDB_CPP_LAMBDA */

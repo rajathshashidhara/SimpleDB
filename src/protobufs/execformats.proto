@@ -1,15 +1,19 @@
 syntax  = "proto3";
 package simpledb.proto;
 
-import "netformats.proto";
-
 message DictArg {
     string key = 1;
     bytes val = 2;
+    bool is_file = 3;
+};
+
+message ListArg {
+    bytes val = 1;
+    bool is_file = 2;
 };
 
 message CPPExecArgs {
-    repeated bytes args = 1;
+    repeated ListArg args = 1;
     repeated DictArg kwargs = 2;
 };
 

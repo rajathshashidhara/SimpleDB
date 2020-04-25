@@ -22,6 +22,12 @@ enum LambdaRuntime {
     WEBASSEMBLY = 3;
 };
 
+enum ArgType {
+    IMMEDIATE = 0;
+    BYTESTRING = 1;
+    FILE = 2;
+}
+
 message RegisterRequest {
     string func_name = 1;    /* Function name */
     bytes func_binary = 2;  /* Code provided as binary string */
@@ -31,12 +37,12 @@ message RegisterRequest {
 };
 
 message ExecListArg {
-    bool immediate = 1;
+    ArgType type = 1;
     bytes key = 2;
 };
 
 message ExecDictArg {
-    bool immediate = 1;
+    ArgType type = 1;
     bytes key = 2;
     bytes val = 3;
 };

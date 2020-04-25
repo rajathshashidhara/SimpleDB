@@ -32,6 +32,7 @@ enum ExecError
     EXEC_STATUS_OK,
     EXEC_STATUS_LOOKUP_FAILED,
     EXEC_STATUS_ARGS_INVALID,
+    EXEC_STATUS_ERR,
 };
 
 struct ExecCmd
