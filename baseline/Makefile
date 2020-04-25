@@ -1,3 +1,6 @@
+DIR := $(shell pwd)
+DIR_LEVELDB := $(DIR)/../leveldb
+DIR_LIBUV := $(DIR)/../libuv
 
 CXX_FLAGS := -g3 -Wall -Werror
 
@@ -15,9 +18,14 @@ CXX_DEPS := $(CXX_SRCS:.cpp=.d)
 
 PROTOBUF_LIBS := $(shell pkg-config --libs protobuf)
 
+CPPFLAGS := -I$(DIR) \
+		-I$(DIR_LIBUV)/include
+
+LDFLAGS := -L$(DIR_LIBUV)/.libs
+
 CXXFLAGS := -g3 -Wall -Werror -MD -MP
 
-LDLIBS := $(PROTOBUF_LIBS) -lglog
+LDLIBS := -luv $(PROTOBUF_LIBS) -lglog
 
 BIN := ggengine.out
 
