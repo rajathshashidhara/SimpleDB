@@ -9,17 +9,11 @@ message PutRequest {
     bytes key = 1;
     bytes val = 2;
     bool immutable = 3;
+    bool executable = 4;
 };
 
 message DeleteRequest {
     bytes key = 1;
-};
-
-enum LambdaRuntime {
-    CPP = 0;
-    PYTHON3 = 1;
-    JAVASCRIPT = 2;
-    WEBASSEMBLY = 3;
 };
 
 enum ArgType {
@@ -27,14 +21,6 @@ enum ArgType {
     BYTESTRING = 1;
     FILE = 2;
 }
-
-message RegisterRequest {
-    string func_name = 1;    /* Function name */
-    bytes func_binary = 2;  /* Code provided as binary string */
-    LambdaRuntime runtime = 3; /* Runtime for lambda */
-    bool list_args = 4;         /* Arguments provided as list */
-    bool dict_args = 5;         /* Arguments provided as dict */
-};
 
 message ExecListArg {
     ArgType type = 1;
@@ -61,8 +47,7 @@ message KVRequest {
         GetRequest get_request = 2;
         PutRequest put_request = 3;
         DeleteRequest delete_request = 4;
-        RegisterRequest register_request = 5;
-        ExecRequest exec_request = 6;
+        ExecRequest exec_request = 5;
     };
 };
 

@@ -14,10 +14,10 @@ namespace simpledb::db
         STATUS_IOERROR
     };
 
-    int init(std::string path=DEFAULT_DB_PATH, bool create=true, size_t cache_size=DEFAULT_DB_CACHE_SIZE);
-    int get(const std::string key, std::string& value);
-    int set(const std::string key, const std::string value, const bool immutable=false);
-    int remove(const std::string key);
+    int init(const std::string path=DEFAULT_DB_PATH, const bool create=true, const size_t cache_size=DEFAULT_DB_CACHE_SIZE);
+    int get(const std::string& key, std::string& value, const bool exec=false);
+    int set(const std::string& key, const std::string& value, const bool immutable=false, const bool executable=false);
+    int remove(const std::string& key);
 }
 
 #endif /* SIMPLEDB_DB_H */

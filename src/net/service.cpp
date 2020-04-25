@@ -11,44 +11,22 @@ extern "C" {
     #include "config.h"
 }
 
-static int process_register_request(const RegisterRequest& reg_request)
-{
-    FunctionMetadata function;
-    std::string serializedfunc;
-
-    function.set_binary(reg_request.func_binary());
-    function.set_runtime(reg_request.runtime());
-    function.set_list_args(reg_request.list_args());
-    function.set_dict_args(reg_request.dict_args());
-
-    serializedfunc = function.SerializeAsString();
-    return simpledb::db::set(reg_request.func_name(), serializedfunc, true);
-}
-
 static int process_exec_request(const ExecRequest& request,
         ExecCmd* cmd)
 {
-    FunctionMetadata function;
     std::string _func;
     CPPExecArgs eargs;
     int ret;
 
-    ret = simpledb::db::get(request.func(), _func);
-    if (ret < 0 || !function.ParseFromString(_func))
+    ret = simpledb::db::get(request.func(), _func, true);
+    if (ret < 0)
     {
         LOG(ERROR) << "Unable to fetch function: " << request.func();
         return -EXEC_STATUS_LOOKUP_FAILED;
     }
 
-    if ((!function.list_args() && (request.list_args_size() > 0)) ||
-        (!function.dict_args() && (request.dict_args_size() > 0)))
-    {
-        LOG(ERROR) << "Invalid arguments";
-        return -EXEC_STATUS_ARGS_INVALID;
-    }
-
     cmd->func_name = std::move(DEFAULT_EXEC_PATH + request.func());
-    cmd->func = std::move(function.binary());
+    cmd->func = std::move(_func);
     auto args = eargs.mutable_args();
     for (auto &arg: request.list_args())
     {
@@ -221,15 +199,12 @@ static int process_kv_request(const KVRequest& request,
 
     case KVRequest::ReqOpsCase::kPutRequest:
         ret = simpledb::db::set(request.put_request().key(),
-                request.put_request().val(), request.put_request().immutable());
+                request.put_request().val(), request.put_request().immutable(),
+                request.put_request().executable());
         break;
 
     case KVRequest::ReqOpsCase::kDeleteRequest:
         ret = simpledb::db::remove(request.delete_request().key());
-        break;
-
-    case KVRequest::ReqOpsCase::kRegisterRequest:
-        ret = process_register_request(request.register_request());
         break;
 
     default:

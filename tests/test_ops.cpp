@@ -104,7 +104,7 @@ int main(int argc, char* argv[])
     if (!receive_response(fd, resp))
         return 1;
 
-    std::cout << "key=" << key << " return_code=" << resp.return_code() << std::endl;
+    std::cout << "SET key=" << key << " return_code=" << resp.return_code() << std::endl;
 
     /* Get */
     GetRequest* get_req = req.mutable_get_request();
@@ -117,7 +117,7 @@ int main(int argc, char* argv[])
     if (!receive_response(fd, resp))
         return 1;
 
-    std::cout << "key=" << key << " return_code=" << resp.return_code() << " value=" << resp.val() << std::endl;
+    std::cout << "GET key=" << key << " return_code=" << resp.return_code() << " value=" << resp.val() << std::endl;
 
     /* Delete */
     DeleteRequest* del_req = req.mutable_delete_request();
@@ -130,7 +130,7 @@ int main(int argc, char* argv[])
     if (!receive_response(fd, resp))
         return 1;
 
-    std::cout << "key=" << key << " return_code=" << resp.return_code() << std::endl;
+    std::cout << "DEL key=" << key << " return_code=" << resp.return_code() << std::endl;
 
     /* Failure Get */
     get_req = req.mutable_get_request();
@@ -143,25 +143,24 @@ int main(int argc, char* argv[])
     if (!receive_response(fd, resp))
         return 1;
 
-    std::cout << "key=" << key << " return_code=" << resp.return_code() << " value=" << resp.val() << std::endl;
+    std::cout << "GET key=" << key << " return_code=" << resp.return_code() << " value=" << resp.val() << std::endl;
 
     /* Register */
-    RegisterRequest* reg_req = req.mutable_register_request();
+    PutRequest* reg_req = req.mutable_put_request();
     req.set_id(id++);
-    reg_req->set_func_name(argv[3]);
+    reg_req->set_key(argv[3]);
     std::ifstream t(argv[3]);
     std::string code((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
-    reg_req->set_func_binary(std::move(code));
-    reg_req->set_runtime(LambdaRuntime::CPP);
-    reg_req->set_list_args(true);
-    reg_req->set_dict_args(false);
+    reg_req->set_val(std::move(code));
+    reg_req->set_immutable(true);
+    reg_req->set_executable(true);
 
     if (!send_request(fd, req))
         return 1;
 
     if (!receive_response(fd, resp))
         return 1;
-    std::cout << "return_code=" << resp.return_code() << std::endl;
+    std::cout << "SET key="<< reg_req->key() <<" return_code=" << resp.return_code() << std::endl;
 
     /* Exec - Immediate */
     ExecRequest* exec_req = req.mutable_exec_request();

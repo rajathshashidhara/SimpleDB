@@ -19,7 +19,7 @@ extern "C" {
     #include <errno.h>
 }
 
-int simpledb::db::init(std::string path, bool create, size_t cache_size)
+int simpledb::db::init(const std::string path, const bool create, const size_t cache_size)
 {
     leveldb::Options options;
     options.create_if_missing = create;
@@ -41,7 +41,7 @@ int simpledb::db::init(std::string path, bool create, size_t cache_size)
     return 0;
 }
 
-int simpledb::db::get(const std::string key, std::string& value)
+int simpledb::db::get(const std::string& key, std::string& value, const bool exec)
 {
     if (db == nullptr)
         return -STATUS_NOTFOUND;
@@ -53,7 +53,7 @@ int simpledb::db::get(const std::string key, std::string& value)
     {
         if (s.IsNotFound())
             return -STATUS_NOTFOUND;
-        
+
         LOG(ERROR) << "Get Key=" << key << " Error: " << s.ToString();
         return -STATUS_IOERROR;
     }
@@ -65,18 +65,22 @@ int simpledb::db::get(const std::string key, std::string& value)
         return -STATUS_IOERROR;
     }
 
+    if (exec && !file.executable())
+        return -STATUS_NOTFOUND;
+
     value = file.content();
     return STATUS_OK;
 }
 
-int simpledb::db::set(const std::string key, const std::string value, const bool immutable)
+int simpledb::db::set(const std::string& key, const std::string& value,
+        const bool immutable, const bool executable)
 {
     if (db == nullptr)
         return -STATUS_IOERROR;
 
     std::string val;
     simpledb::proto::FileMetadata file;
-    
+
     leveldb::Status s = db->Get(leveldb::ReadOptions(), key, &val);
     if (!s.IsNotFound())
     {
@@ -97,11 +101,12 @@ int simpledb::db::set(const std::string key, const std::string value, const bool
         unlink(cache_path.c_str());
     }
 
-    file.set_immutable(immutable);
     file.set_content(value);
+    file.set_immutable(immutable);
+    file.set_executable(executable);
     val = file.SerializeAsString();
 
-    s = db->Put(leveldb::WriteOptions(), key, file.SerializeAsString());
+    s = db->Put(leveldb::WriteOptions(), key, val);
     if (!s.ok())
     {
         LOG(ERROR) << "Set Key=" << key << " Error: " << s.ToString();
@@ -111,7 +116,7 @@ int simpledb::db::set(const std::string key, const std::string value, const bool
     return STATUS_OK;
 }
 
-int simpledb::db::remove(const std::string key)
+int simpledb::db::remove(const std::string& key)
 {
     if (db == nullptr)
         return -STATUS_NOTFOUND;
