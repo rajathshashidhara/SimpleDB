@@ -1,4 +1,4 @@
-SUBDIRS = src tests
+SUBDIRS = src tests baseline
 
 .PHONY: subdirs $(SUBDIRS) all clean
 
