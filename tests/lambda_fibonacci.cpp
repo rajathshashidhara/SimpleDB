@@ -1,18 +1,20 @@
 #include "execution/cpplambda.h"
 #include <sstream>
 
-int lambda_exec(std::vector<std::pair<bool, std::string> >& args,
-        std::unordered_map<std::string, std::pair<bool, std::string> >& kwargs,
-        std::string& output)
+void lambda_exec(const simpledb::proto::ExecArgs& params,
+                simpledb::proto::ExecResponse& resp)
 {
     unsigned a, b;
 
-    if (args.size() < 2)
-        return -1;
+    if (params.args_size() < 2)
+        throw std::runtime_error("Incorrect arguments");
 
-    a = (unsigned) std::stoi(args[0].second);
-    b = (unsigned) std::stoi(args[1].second);
+    a = (unsigned) std::stoi(params.args()[0]);
+    b = (unsigned) std::stoi(params.args()[1]);
 
-    output = std::move(std::to_string(a + b));
-    return 0;
+    resp.Clear();
+    resp.set_return_code(0);
+    resp.set_return_output(std::to_string(a + b));
+
+    return;
 }

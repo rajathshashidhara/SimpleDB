@@ -166,15 +166,8 @@ int main(int argc, char* argv[])
     ExecRequest* exec_req = req.mutable_exec_request();
     req.set_id(id++);
     exec_req->set_func(argv[3]);
-    exec_req->set_put_output(true);
-    exec_req->set_output_key("2");
-    auto args = exec_req->mutable_list_args();
-    ExecListArg *arg_1 = args->Add();
-    arg_1->set_type(ArgType::IMMEDIATE);
-    arg_1->set_key(std::to_string(1));
-    ExecListArg *arg_2 = args->Add();
-    arg_2->set_type(ArgType::IMMEDIATE);
-    arg_2->set_key(std::to_string(1));
+    exec_req->add_immediate_args(std::to_string(2));
+    exec_req->add_immediate_args(std::to_string(3));
 
     if (!send_request(fd, req))
         return 1;
@@ -183,47 +176,6 @@ int main(int argc, char* argv[])
         return 1;
     std::cout << "value="<< resp.val() << " return_code=" << resp.return_code() << std::endl;
 
-    exec_req = req.mutable_exec_request();
-    req.set_id(id++);
-    exec_req->set_func(argv[3]);
-    exec_req->set_put_output(true);
-    exec_req->set_output_key("3");
-    exec_req->clear_list_args();
-    args = exec_req->mutable_list_args();
-    arg_1 = args->Add();
-    arg_1->set_type(ArgType::IMMEDIATE);
-    arg_1->set_key(std::to_string(1));
-    arg_2 = args->Add();
-    arg_2->set_type(ArgType::BYTESTRING);
-    arg_2->set_key(std::to_string(2));
-
-    if (!send_request(fd, req))
-        return 1;
-
-    if (!receive_response(fd, resp))
-        return 1;
-    std::cout << "value="<< resp.val() << " return_code=" << resp.return_code() << std::endl;
-
-    exec_req = req.mutable_exec_request();
-    req.set_id(id++);
-    exec_req->set_func(argv[3]);
-    exec_req->set_put_output(false);
-    exec_req->clear_output_key();
-    exec_req->clear_list_args();
-    args = exec_req->mutable_list_args();
-    arg_1 = args->Add();
-    arg_1->set_type(ArgType::BYTESTRING);
-    arg_1->set_key(std::to_string(2));
-    arg_2 = args->Add();
-    arg_2->set_type(ArgType::BYTESTRING);
-    arg_2->set_key(std::to_string(3));
-
-    if (!send_request(fd, req))
-        return 1;
-
-    if (!receive_response(fd, resp))
-        return 1;
-    std::cout << "value="<< resp.val() << " return_code=" << resp.return_code() << std::endl;
 
     google::protobuf::ShutdownProtobufLibrary();
     return 0;

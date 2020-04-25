@@ -2,43 +2,30 @@ syntax  = "proto3";
 package simpledb.proto;
 
 message GetRequest {
-    bytes key = 1;
+    string key = 1;
 };
 
 message PutRequest {
-    bytes key = 1;
+    string key = 1;
     bytes val = 2;
     bool immutable = 3;
     bool executable = 4;
 };
 
 message DeleteRequest {
-    bytes key = 1;
+    string key = 1;
 };
 
-enum ArgType {
-    IMMEDIATE = 0;
-    BYTESTRING = 1;
-    FILE = 2;
-}
-
-message ExecListArg {
-    ArgType type = 1;
-    bytes key = 2;
-};
-
-message ExecDictArg {
-    ArgType type = 1;
-    bytes key = 2;
-    bytes val = 3;
+message KV {
+    string key = 1;
+    bytes val = 2;
 };
 
 message ExecRequest {
-    bytes func = 1; /* Function name */
-    repeated ExecListArg list_args = 2;
-    repeated ExecDictArg dict_args = 3;
-    bool put_output = 4;
-    bytes output_key = 5;       /* Only required for ExecPut */
+    string func = 1; /* Function name */
+    repeated bytes immediate_args = 2;
+    repeated string file_args = 3; /* (K,V) read and stored as file:///<blob_dir>/K */
+    repeated KV dict_args = 4;
 };
 
 message KVRequest {

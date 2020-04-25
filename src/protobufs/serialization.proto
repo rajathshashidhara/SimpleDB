@@ -1,8 +1,6 @@
 syntax  = "proto3";
 package simpledb.proto;
 
-import "netformats.proto";
-
 message FileMetadata {
     bytes content = 1;
     bool immutable = 2;

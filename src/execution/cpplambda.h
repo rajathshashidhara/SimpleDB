@@ -6,11 +6,16 @@
 #include <vector>
 #include <unordered_map>
 
-#define PARSE_FAILURE_CODE 0xdeadbeef
-#define OUTPUT_FAILURE_CODE 0xbeefdead
+#include "protobufs/execformats.pb.h"
 
-extern int lambda_exec(std::vector<std::pair<bool, std::string> >& args,
-        std::unordered_map<std::string, std::pair<bool, std::string> >& kwargs,
-        std::string& output);
+enum ExecErrorCodes {
+    EXEC_OK,
+    EXEC_INPUT_ERROR,
+    EXEC_EXCEPTION,
+    EXEC_OUTPUT_ERROR
+};
+
+extern void lambda_exec(const simpledb::proto::ExecArgs& params,
+                simpledb::proto::ExecResponse& resp);
 
 #endif /* SIMPLEDB_CPP_LAMBDA */

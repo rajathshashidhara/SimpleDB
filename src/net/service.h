@@ -41,8 +41,6 @@ struct ExecCmd
     std::string func_name;
     std::string func;
     std::string arguments;
-    std::string output_key;
-    bool put_output;
     std::string output;
 };
 
