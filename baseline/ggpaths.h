@@ -41,13 +41,16 @@ class GGCache {
     {
         std::string rpath = move(GGPaths::reduction_path(key));
 
-        if (access(rpath.c_str(), R_OK | W_OK | X_OK) < 0)
+        if (access(rpath.c_str(), R_OK | W_OK) < 0)
             return "";
 
         std::ifstream tin;
         tin.open(rpath, std::ios::in | std::ios::binary);
         std::string output = std::string((std::istreambuf_iterator<char>(tin)),
             std::istreambuf_iterator<char>());
+
+        auto idx = output.find(" ");
+        return output.substr(0, idx);
     }
 
 public:

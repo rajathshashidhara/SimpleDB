@@ -1,5 +1,6 @@
 #include <string>
 #include <glog/logging.h>
+#include <errno.h>
 
 #include "leveldb/db.h"
 #include "leveldb/cache.h"
@@ -24,6 +25,7 @@ int simpledb::db::init(const std::string path, const bool create, const size_t c
     leveldb::Options options;
     options.create_if_missing = create;
     options.block_cache = leveldb::NewLRUCache(cache_size);
+    options.error_if_exists = false;
 
     leveldb::Status status = leveldb::DB::Open(options, path, &db);
     if (!status.ok())
@@ -34,6 +36,9 @@ int simpledb::db::init(const std::string path, const bool create, const size_t c
 
     if (mkdir(DEFAULT_EXEC_PATH, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH) < 0)
     {
+        if (errno == EEXIST)
+            return 0;
+
         LOG(FATAL) << "Cannot create database. Error: " << status.ToString();
         return -1;
     }
@@ -52,9 +57,12 @@ int simpledb::db::get(const std::string& key, std::string& value, const bool exe
     if (!s.ok())
     {
         if (s.IsNotFound())
+        {
+            LOG(INFO) << "Get Key=" << key << " Not found";
             return -STATUS_NOTFOUND;
+        }
 
-        LOG(ERROR) << "Get Key=" << key << " Error: " << s.ToString();
+        LOG(INFO) << "Get Key=" << key << " Error: " << s.ToString();
         return -STATUS_IOERROR;
     }
 
@@ -92,7 +100,7 @@ int simpledb::db::set(const std::string& key, const std::string& value,
 
         if (file.immutable())
         {
-            LOG(ERROR) << "Set Key=" << key << " Error: Cannot modify immutable file";
+            LOG(INFO) << "Set Key=" << key << " Error: Cannot modify immutable file";
             return -STATUS_IMMUTABLE;
         }
 
@@ -124,7 +132,7 @@ int simpledb::db::remove(const std::string& key)
     leveldb::Status s = db->Delete(leveldb::WriteOptions(), key);
     if (s.IsNotFound())
     {
-        LOG(ERROR) << "Remove Key=" << key << " Error: " << s.ToString();
+        LOG(INFO) << "Remove Key=" << key << " Error: " << s.ToString();
         return -STATUS_NOTFOUND;
     }
     else if (!s.ok())

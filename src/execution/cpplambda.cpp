@@ -25,6 +25,7 @@ static inline int return_output(const ExecResponse& resp)
 
 int main(int argc, char* argv[])
 {
+    GOOGLE_PROTOBUF_VERIFY_VERSION;
     ExecArgs args;
     ExecResponse resp;
 
@@ -43,5 +44,6 @@ int main(int argc, char* argv[])
     if (return_output(resp) < 0)
         return EXEC_OUTPUT_ERROR;
 
+    google::protobuf::ShutdownProtobufLibrary();
     return EXEC_OK;
 }

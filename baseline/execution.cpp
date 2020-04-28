@@ -51,7 +51,7 @@ void handler(const ExecutionRequest& req, ExecutionResponse& resp)
         {
             for (auto& thunk: thunks)
             {
-                string thunk_data = move(thunk.data());
+                string thunk_data = std::move(base64_decode(thunk.data()));
                 string thunk_path = move(GGPaths::blob_path(thunk.hash()));
                 if (access(thunk_path.c_str(), O_RDWR) == 0)
                 {
@@ -63,6 +63,8 @@ void handler(const ExecutionRequest& req, ExecutionResponse& resp)
                 thunk_file.open(thunk_path, ios::out | ios::binary);
                 thunk_file << thunk_data;
             }
+
+            break;
         }
         catch (ostream::failure& e)
         {
@@ -85,7 +87,7 @@ void handler(const ExecutionRequest& req, ExecutionResponse& resp)
         }
     }
 
-    string command = "gg-execute-static --get-dependencies --put-output --cleanup";
+    string command = "./gg-execute-static --get-dependencies --put-output --cleanup";
     if (timelog)
         command.append(" --timelog");
     for (auto& thunk: thunks)
@@ -104,11 +106,12 @@ void handler(const ExecutionRequest& req, ExecutionResponse& resp)
     {
         auto executed_thunk = executed_thunks->Add();
         auto executed_thunk_outputs = executed_thunk->mutable_outputs();
+        executed_thunk->set_thunk_hash(thunk.hash());
         for (auto &output_tag : thunk.outputs())
         {
             auto output_hash = GGCache::check(thunk.hash(), output_tag);
 
-            if (!output_hash.empty())
+            if (output_hash.empty())
             {
                 resp.clear_executed_thunks();
                 return;
@@ -121,6 +124,7 @@ void handler(const ExecutionRequest& req, ExecutionResponse& resp)
                 tin.open(GGPaths::blob_path(output_hash), ios::binary | ios::in);
                 data = move(string((istreambuf_iterator<char>(tin)),
                 istreambuf_iterator<char>()));
+                data = move(base64_encode((const unsigned char*) data.c_str(), data.length()));
             }
 
             auto output = executed_thunk_outputs->Add();

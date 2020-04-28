@@ -239,7 +239,7 @@ static void on_connect(uv_connect_t* connect, int status)
         KVRequest req;
         req.set_id(params->op_id++);
         PutRequest* put_req = req.mutable_put_request();
-        put_req->set_immutable(true);
+        put_req->set_immutable(false);
         put_req->set_key(params->keys[i]);
         put_req->set_val(params->val);
 
@@ -336,10 +336,11 @@ int main(int argc, char* argv[])
 
     std::random_device engine;
     std::string key;
-    for (size_t i = 0; i < params->klen; i += sizeof(unsigned))
+    for (size_t i = 0; i < params->klen; i += sizeof(char))
     {
-        unsigned x = engine();
-        key.append((char*) &x);
+        char x = engine();
+        x %= 128;
+        key.append(std::to_string(x));
     }
     for (size_t i = 0; i < params->vlen; i += sizeof(unsigned))
     {
