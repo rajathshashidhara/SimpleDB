@@ -1,3 +1,5 @@
+#include <string>
+#include <cstdlib>
 #include <glog/logging.h>
 #include "gg.pb.h"
 
@@ -409,7 +411,13 @@ int main(int argc, char* argv[])
     GOOGLE_PROTOBUF_VERIFY_VERSION;
     google::InitGoogleLogging(argv[0]);
 
-    if (connections_main(PORT, BACKLOG) < 0)
+    unsigned port = PORT;
+    if (argc > 1)
+    {
+        port = (unsigned) std::stoul(argv[1]);
+    }
+
+    if (connections_main(port, BACKLOG) < 0)
         return -1;
 
     if (uv_run(uv_default_loop(), UV_RUN_DEFAULT) < 0)
