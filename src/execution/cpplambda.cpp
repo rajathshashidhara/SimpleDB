@@ -19,7 +19,7 @@ static inline int return_output(const ExecResponse& resp)
 {
     if (!resp.SerializeToOstream(&std::cout))
         return -1;
-    
+
     return 0;
 }
 

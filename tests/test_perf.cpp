@@ -6,7 +6,7 @@
 #include <vector>
 #include <chrono>
 #include <unordered_map>
-#include "protobufs/netformats.pb.h"
+#include "formats/netformats.pb.h"
 
 extern "C" {
     #include "uv.h"

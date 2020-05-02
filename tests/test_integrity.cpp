@@ -3,7 +3,7 @@
 #include <fstream>
 #include <streambuf>
 #include <cstdlib>
-#include "protobufs/netformats.pb.h"
+#include "formats/netformats.pb.h"
 
 extern "C" {
     #include <sys/types.h>

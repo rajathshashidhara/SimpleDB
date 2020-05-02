@@ -9,7 +9,7 @@ CXX_DEPS := $(CXX_SRCS:.cpp=.d)
 
 CPPFLAGS := -I..
 
-LDFLAGS := -L$(DIR)/protobufs
+LDFLAGS := -L$(DIR)/formats
 LDLIBS :=  -lformats $(PROTOBUF_LIBS)
 
 FORMATS_LIB := libformats.a
@@ -21,10 +21,10 @@ $(LIB): $(CXX_OBJS)
 	ranlib $@
 
 $(FORMATS_LIB):
-	$(MAKE) -C ../protobufs
+	$(MAKE) -C ../formats
 
 clean:
 	rm -vf $(CXX_OBJS) $(CXX_DEPS) $(LIB)
-	$(MAKE) -C ../protobufs clean
+	$(MAKE) -C ../formats clean
 
 -include $(CXX_DEPS)

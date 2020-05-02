@@ -6,7 +6,7 @@
 #include <vector>
 #include <unordered_map>
 
-#include "protobufs/execformats.pb.h"
+#include "formats/execformats.pb.h"
 
 enum ExecErrorCodes {
     EXEC_OK,

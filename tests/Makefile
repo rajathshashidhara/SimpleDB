@@ -18,7 +18,7 @@ CPPFLAGS := -I$(DIR_SERVER) \
 
 CXXFLAGS := -g3 -O2 -Wall -Werror -MD -MP
 
-LDFLAGS := -L$(DIR_SERVER)/protobufs \
+LDFLAGS := -L$(DIR_SERVER)/formats \
 			-L$(DIR_SERVER)/execution \
 			-L$(DIR_LIBUV)/.libs
 
@@ -38,10 +38,10 @@ lambda_fibonacci.out: lambda_fibonacci.o
 	$(CXX) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
 $(FORMATS_LIB):
-	$(MAKE) -C $(DIR_SERVER)/protobufs
+	$(MAKE) -C $(DIR_SERVER)/formats
 
 clean:
 	rm -vf $(CXX_OBJS) $(CXX_DEPS) $(BINS)
-	$(MAKE) -C $(DIR_SERVER)/protobufs clean
+	$(MAKE) -C $(DIR_SERVER)/formats clean
 
 -include $(CXX_DEPS)

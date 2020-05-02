@@ -3,14 +3,15 @@
 
 #include <cstdlib>
 
-#include "protobufs/netformats.pb.h"
-#include "protobufs/execformats.pb.h"
+#include "net/client.h"
+#include "util/optional.h"
+#include "storage/db.h"
+#include "formats/netformats.pb.h"
+#include "formats/execformats.pb.h"
 
 extern "C" {
     #include "uv.h"
 }
-
-using namespace simpledb::proto;
 
 #define WORK_ERROR 0x1
 #define WORK_EXEC  0x2
@@ -44,7 +45,47 @@ struct ExecCmd
     std::string output;
 };
 
-void handle_request(uv_work_t* wq);
-void handle_exec_compl(uv_work_t* wq);
+struct WorkRequest
+{
+    ClientState* client;
+
+    enum {KV, EXEC} tag;
+    simpledb::proto::KVRequest kv;
+    simpledb::proto::ExecResponse exec;
+
+    ~WorkRequest() {}
+};
+
+struct WorkResult {
+    ClientState* client;
+
+    enum {KV, EXEC} tag;
+    simpledb::proto::KVResponse kv;
+    ExecCmd exec;
+
+    ~WorkResult() {}
+};
+
+class Worker {
+private:
+    static simpledb::storage::SimpleDB* db;
+    static void process_kv_request(const simpledb::proto::KVRequest& request,
+                                    simpledb::proto::KVResponse& response);
+    static void process_exec_request(const simpledb::proto::ExecRequest& request,
+                                    ExecCmd& command);
+    static void process_exec_result(const simpledb::proto::ExecResponse& result,
+                                    simpledb::proto::KVResponse& response);
+public:
+    Worker(const simpledb::storage::SimpleDBConfig& config)
+    {
+        db = new simpledb::storage::SimpleDB(config);
+    }
+    ~Worker()
+    {
+        if (db != nullptr)
+            delete db;
+    }
+    static void process_work(uv_work_t* work);
+};
 
 #endif /* SIMPLEDB_NET_SERVICE */
