@@ -21,24 +21,14 @@ class ClientState
 {
 private:
     uv_tcp_t* tcp_handle;
-    uv_loop_t* execution_loop;
     ProtobufStreamParser<simpledb::proto::KVRequest> parser;
     std::string read_buffer_;
     std::deque<std::string> write_buffer_;
     KVRequestCallback new_request_callback_;
 
-    std::string& allocate_read_buffer(size_t suggested_size)
-    {
-        read_buffer_ = std::string(suggested_size, 0);
-        return read_buffer_;
-    }
-
-    void pop_write_buffer()
-    {
-        write_buffer_.pop_front();
-    }
-
 public:
+    uv_loop_t* execution_loop;
+
     ClientState(const uv_tcp_t* listen_handle);
     ~ClientState();
 

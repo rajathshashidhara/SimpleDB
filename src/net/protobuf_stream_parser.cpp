@@ -1,6 +1,7 @@
 #include <iostream>
 #include "protobuf_stream_parser.h"
 #include "formats/netformats.pb.h"
+#include "formats/execformats.pb.h"
 
 using namespace std;
 
@@ -52,3 +53,5 @@ void ProtobufStreamParser<Message>::parse(const string& buf)
 
 template class
 ProtobufStreamParser<simpledb::proto::KVRequest>;
+template class
+ProtobufStreamParser<simpledb::proto::ExecResponse>;

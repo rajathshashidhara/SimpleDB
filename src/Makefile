@@ -7,7 +7,7 @@ CXX_OBJS := $(CXX_SRCS:.cpp=.o)
 CXX_DEPS := $(CXX_SRCS:.cpp=.d)
 
 PROTOBUF_LIBS := $(shell pkg-config --libs protobuf)
-LIBS_DIR := storage net util formats
+LIBS_DIR := storage net execution util formats
 APP_LIBS := $(addprefix -l, $(LIBS_DIR))
 LIBS_INC := $(addprefix -L$(DIR)/, $(LIBS_DIR))
 

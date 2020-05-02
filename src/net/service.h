@@ -3,6 +3,7 @@
 
 #include <cstdlib>
 
+#include "execution/runtime.h"
 #include "net/client.h"
 #include "util/optional.h"
 #include "storage/db.h"
@@ -12,21 +13,6 @@
 extern "C" {
     #include "uv.h"
 }
-
-#define WORK_ERROR 0x1
-#define WORK_EXEC  0x2
-struct work_request
-{
-    uv_handle_t*    handle;
-    uv_file         exec_fd;
-    uv_process_t    process;
-    uv_pipe_t       input_pipe;
-    uv_pipe_t       output_pipe;
-    void*           buffer;
-    void*           output_buffer;
-    size_t          len;
-    int             flags;
-};
 
 enum ExecError
 {
@@ -47,21 +33,24 @@ struct ExecCmd
 
 struct WorkRequest
 {
-    ClientState* client;
+    const uint64_t id;
+    ClientState* const client;
 
-    enum {KV, EXEC} tag;
+    enum {KV, EXEC} const tag;
     simpledb::proto::KVRequest kv;
     simpledb::proto::ExecResponse exec;
 
     ~WorkRequest() {}
 };
 
-struct WorkResult {
-    ClientState* client;
+struct WorkResult
+{
+    const uint64_t id;
+    ClientState* const client;
 
-    enum {KV, EXEC} tag;
+    enum {KV, EXEC} const tag;
     simpledb::proto::KVResponse kv;
-    ExecCmd exec;
+    simpledb::proto::ExecArgs exec;
 
     ~WorkResult() {}
 };
@@ -72,7 +61,7 @@ private:
     static void process_kv_request(const simpledb::proto::KVRequest& request,
                                     simpledb::proto::KVResponse& response);
     static void process_exec_request(const simpledb::proto::ExecRequest& request,
-                                    ExecCmd& command);
+                                    simpledb::proto::ExecArgs& args);
     static void process_exec_result(const simpledb::proto::ExecResponse& result,
                                     simpledb::proto::KVResponse& response);
 public:

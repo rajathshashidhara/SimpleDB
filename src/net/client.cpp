@@ -35,7 +35,7 @@ ClientState::ClientState(const uv_tcp_t* listen_handle)
 
 ClientState::~ClientState()
 {
-    auto close_cb = [](uv_handle_t* handle) {};
+    static auto close_cb = [](uv_handle_t* handle) {};
     uv_close((uv_handle_t*) tcp_handle, close_cb);
 
     delete tcp_handle;
@@ -50,8 +50,9 @@ void ClientState::Read(const KVRequestCallback& kv_cb)
                                 size_t suggested_size,
                                 uv_buf_t* buf)
     {
-        auto *state = (ClientState*) handle->data;
-        buf->base = &(state->allocate_read_buffer(suggested_size)[0]);
+        auto state = (ClientState*) handle->data;
+        state->read_buffer_ = string(suggested_size, 0);
+        buf->base = &(state->read_buffer_[0]);
         buf->len = suggested_size;
     };
 
@@ -109,7 +110,7 @@ void ClientState::Write(string && data)
             return;
         }
 
-        state->pop_write_buffer();
+        state->write_buffer_.pop_front();
     };
 
     if ((ret = uv_write(write_req,

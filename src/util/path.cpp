@@ -108,9 +108,9 @@ namespace roost {
     return other.path_ == path_;
   }
 
-  bool exists( const path & pathn )
+  bool exists( const path & pathn, const int mode)
   {
-    return not access( pathn.string().c_str(), F_OK );
+    return not access( pathn.string().c_str(), mode );
   }
 
   /* XXX need to be careful about race conditions if file size
