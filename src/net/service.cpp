@@ -29,6 +29,7 @@ void Worker::process_kv_request(const KVRequest& request,
     switch(request.ReqOps_case())
     {
         case KVRequest::ReqOpsCase::kGetRequest:
+            LOG(ERROR) << "GET " << request.get_request().key();
             get_requests.emplace_back(request.get_request().key());
             db->get(get_requests,
                 [&response](const simpledb::storage::GetRequest& request,
@@ -42,6 +43,7 @@ void Worker::process_kv_request(const KVRequest& request,
             break;
 
         case KVRequest::ReqOpsCase::kPutRequest:
+            LOG(ERROR) << "PUT " << request.get_request().key();
             put_requests.emplace_back(request.put_request().key(),
                 request.put_request().val(),
                 request.put_request().immutable(),
@@ -56,6 +58,7 @@ void Worker::process_kv_request(const KVRequest& request,
             break;
 
         case KVRequest::ReqOpsCase::kDeleteRequest:
+            LOG(ERROR) << "DEL " << request.get_request().key();
             delete_requests.push_back(request.delete_request().key());
             db->del(delete_requests,
                 [&response](const string& request,
@@ -76,6 +79,7 @@ void Worker::process_kv_request(const KVRequest& request,
 void Worker::process_exec_request(const ExecRequest& request,
                                     ExecArgs& cmd)
 {
+    LOG(ERROR) << "EXEC";
     vector<simpledb::storage::GetRequest> get_requests;
 
     cmd.set_function(request.func());
@@ -143,9 +147,10 @@ void Worker::process_exec_result(const simpledb::proto::ExecResponse& result,
     // Add File Args
     for (auto &arg: result.f_output())
     {
+        roost::path f_path(arg.val());
         put_requests.emplace_back(
             arg.key(),
-            arg.val(),
+            f_path,
             arg.immutable(),
             arg.executable()
         );

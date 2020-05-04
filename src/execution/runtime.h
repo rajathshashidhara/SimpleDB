@@ -28,9 +28,9 @@ private:
     std::string output_buffer_;
     ProtobufStreamParser<simpledb::proto::ExecResponse> parser;
 
-    uv_process_t* process   { nullptr };
-    uv_pipe_t* input_pipe   { nullptr };
-    uv_pipe_t* output_pipe  { nullptr };
+    uv_process_t process;
+    uv_pipe_t input_pipe;
+    uv_pipe_t output_pipe;
 
 public:
     const uint64_t req_id;
@@ -46,10 +46,9 @@ public:
                 const simpledb::proto::ExecResponse&){}),
             req_id(id), client(state)
         {
-            process = new uv_process_t();
-            process->data = this;
+            process.data = this;
         }
-    ~ExecutionState();
+    ~ExecutionState() {}
     void Spawn(const ExecComplCallback& exec_cb);
 };
 

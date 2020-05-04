@@ -32,7 +32,7 @@ FORMATS_LIB := libformats.a
 all: $(FORMATS_LIB) $(BINS)
 
 lambda_fibonacci.out: lambda_fibonacci.o
-	$(CXX) -static $(LDFLAGS) -o $@ $^ -lcpplambda $(LDLIBS)
+	$(CXX) $(LDFLAGS) -o $@ $^ -lcpplambda $(LDLIBS)
 
 %.out: %.o
 	$(CXX) $(LDFLAGS) -o $@ $^ $(LDLIBS)

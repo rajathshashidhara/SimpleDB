@@ -1,4 +1,5 @@
 #include <iostream>
+#include <glog/logging.h>
 #include "protobuf_stream_parser.h"
 #include "formats/netformats.pb.h"
 #include "formats/execformats.pb.h"

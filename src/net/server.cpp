@@ -30,7 +30,6 @@ static void on_execution_completion(
     WorkRequest* work_request = new WorkRequest{exec_state->req_id,
                                                 exec_state->client,
                                                 WorkRequest::EXEC};
-    delete exec_state;  // Dispose off execution context!
 
     work_request->exec = std::move(response);
 
@@ -38,7 +37,7 @@ static void on_execution_completion(
     work->data = work_request;
 
     int ret;
-    if ((ret = uv_queue_work(uv_default_loop(), work,
+    if ((ret = uv_queue_work(work_request->client->execution_loop, work,
                 Worker::process_work, on_work_completion)) < 0)
     {
         LOG(ERROR) << "Failed to launch work handler. Error: " << uv_strerror(ret);
