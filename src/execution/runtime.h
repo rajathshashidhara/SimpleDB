@@ -14,7 +14,7 @@ extern "C" {
 class ExecutionState;
 
 typedef std::function<void(ExecutionState* state,
-                        const simpledb::proto::ExecResponse&
+                        simpledb::proto::ExecResponse
                     )> ExecComplCallback;
 
 class ExecutionState
@@ -31,6 +31,11 @@ private:
     uv_process_t process;
     uv_pipe_t input_pipe;
     uv_pipe_t output_pipe;
+
+    friend void exec_completion_cb(uv_process_t* process, int64_t exit_status, int term_signal);
+    friend void pipe_allocate_read_buffer_cb(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf);
+    friend void pipe_read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* buf);
+    friend void pipe_write_cb(uv_write_t* req, int status);
 
 public:
     const uint64_t req_id;

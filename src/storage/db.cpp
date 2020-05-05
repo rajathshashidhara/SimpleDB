@@ -2,6 +2,7 @@
 #include <sstream>
 #include <exception>
 #include <thread>
+#include <atomic>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -12,6 +13,7 @@
 #include "leveldb/db.h"
 #include "leveldb/cache.h"
 #include "formats/serialization.pb.h"
+#include "formats/netformats.pb.h"
 
 #include "storage/db.h"
 #include "util/exception.h"
@@ -21,6 +23,29 @@
 
 using namespace simpledb::storage;
 using namespace std;
+
+static inline void send_request(TCPSocket* socket, simpledb::proto::KVRequest& req)
+{
+    std::string req_s = req.SerializeAsString();
+    size_t len = req_s.length();
+    static size_t slen = (ssize_t) sizeof(size_t);
+
+    socket->write(string((char*) &len, slen));
+    socket->write(req_s);
+}
+
+static inline bool receive_response(TCPSocket* socket, simpledb::proto::KVResponse& resp)
+{
+    size_t len;
+    const static size_t slen = sizeof(size_t);
+
+    len = *((size_t*) (&socket->read_exactly(slen)[0]));
+
+    if (!resp.ParseFromString(socket->read_exactly(len)))
+        return false;
+
+    return true;
+}
 
 SimpleDB::SimpleDB(const SimpleDBConfig& config)
     : config_(config), db(nullptr), conns_(config.num_, nullptr)
@@ -38,10 +63,15 @@ SimpleDB::SimpleDB(const SimpleDBConfig& config)
         LOG(FATAL) << "Cannot create database. Error: " << status.ToString();
         throw runtime_error("Cannot create database. Error: " + status.ToString());
     }
+}
 
+void SimpleDB::connect()
+{
     for (unsigned idx = 0; idx < config_.num_; idx++)
     {
         unsigned retry = 0;
+        conns_[idx] = new TCPSocket();
+
         if (idx == config_.replica_idx)
             continue;
 
@@ -49,7 +79,6 @@ SimpleDB::SimpleDB(const SimpleDBConfig& config)
         {
             try
             {
-                conns_[idx] = new TCPSocket();
                 conns_[idx]->connect(config_.address_[idx]);
                 break;
             }
@@ -64,6 +93,8 @@ SimpleDB::SimpleDB(const SimpleDBConfig& config)
             sleep(config_.conn_timeout_seconds);
         }
     }
+
+    init = true;
 }
 
 void SimpleDB::get(vector<GetRequest>& download_requests,
@@ -71,9 +102,14 @@ void SimpleDB::get(vector<GetRequest>& download_requests,
                                     const DbOpStatus,
                                     const std::string&)>& callback)
 {
-    const size_t bucket_count = config_.num_;
+    if (!init)
+        connect();
 
+    const size_t bucket_count = config_.num_;
+    const size_t batch_size = config_.max_batch_size;
     vector<vector<GetRequest>> buckets(bucket_count);
+
+    // LOG(ERROR) << "GET Size=" << download_requests.size();
     for (size_t r_id = 0; r_id < download_requests.size(); r_id++)
     {
         const string& object_key = download_requests.at(r_id).object_key;
@@ -81,32 +117,111 @@ void SimpleDB::get(vector<GetRequest>& download_requests,
         buckets[bIdx].emplace_back(move(download_requests.at(r_id)));
     }
 
-    for (size_t bIdx = 0; bIdx < bucket_count; bIdx++)
+    vector<size_t> non_empty_buckets;
+    for (size_t idx = 0; idx < bucket_count; idx++)
     {
-        if (bIdx == config_.replica_idx)
-        {
-            /* Local */
-            for (auto &req: buckets[bIdx])
-            {
-                string content;
-                auto status = local_get(req, content);
-                callback(req, status, content);
-            }
-        }
-        else
-        {
-            throw runtime_error("Not implemented!");
-        }
+        if (buckets[idx].size() > 0)
+            non_empty_buckets.push_back(idx);
     }
+
+    const size_t thread_count = non_empty_buckets.size();
+    vector<thread> threads;
+    for (size_t thread_index = 0;
+            thread_index < thread_count;
+            thread_index++)
+    {
+        threads.emplace_back(
+            [&](const size_t index)
+            {
+                const size_t bIdx = non_empty_buckets[index];
+                // LOG(ERROR) << "tID=" << index << " bIdx=" << bIdx << " Replica= " << config_.replica_idx << " Size=" << buckets[bIdx].size();
+                /* Local */
+                if (bIdx == config_.replica_idx)
+                {
+                    for (auto &req: buckets[bIdx])
+                    {
+                        string content;
+                        auto status = local_get(req, content);
+                        callback(req, status, content);
+                    }
+                }
+                else
+                {
+                    for (size_t first_file_idx = 0;
+                        first_file_idx < buckets[bIdx].size();
+                        first_file_idx += batch_size)
+                    {
+                        size_t expected_responses = 0;
+
+                        for (size_t file_id = first_file_idx;
+                            file_id < min(buckets[bIdx].size(), first_file_idx + batch_size);
+                            file_id += 1)
+                        {
+                            const string & object_key =
+                                buckets[bIdx].at(file_id).object_key;
+
+                            simpledb::proto::KVRequest req;
+                            req.set_id(file_id);
+                            auto get_req = req.mutable_get_request();
+                            get_req->set_key(object_key);
+
+                            // LOG(ERROR) << "GET " << object_key << " FROM " << bIdx;
+                            send_request(this->conns_[bIdx], req);
+                            expected_responses++;
+                        }
+
+                        size_t response_count = 0;
+                        while (response_count != expected_responses)
+                        {
+                            simpledb::proto::KVResponse resp;
+
+                            if (!receive_response(this->conns_[bIdx], resp))
+                                throw runtime_error("failed to get response");
+
+                            const size_t response_index = resp.id();
+                            auto &req = buckets[bIdx].at(response_index);
+                            string content;
+                            if (resp.return_code() != 0){
+                                callback(req, static_cast<DbOpStatus>(resp.return_code()), content);
+                                response_count++;
+                                continue;
+                            }
+
+                            // LOG(ERROR) << "GOT " << req.object_key << " FROM " << bIdx;
+                            content = std::move(resp.val());
+                            if (req.filename.initialized())
+                            {
+                                roost::atomic_create(content, req.filename.get(),
+                                    req.mode.initialized(),
+                                    req.mode.get_or(0));
+                            }
+
+                            callback(req, DbOpStatus::STATUS_OK, content);
+
+                            response_count++;
+                        }
+                    }
+                }
+            },
+            thread_index
+        );
+    }
+
+    for (auto & thread : threads)
+        thread.join();
 }
 
 void SimpleDB::put(vector<PutRequest>& upload_requests,
             const function<void(const PutRequest&,
                                     const DbOpStatus)>& callback)
 {
-    const size_t bucket_count = config_.num_;
+    if (!init)
+        connect();
 
+    const size_t bucket_count = config_.num_;
+    const size_t batch_size = config_.max_batch_size;
     vector<vector<PutRequest>> buckets(bucket_count);
+
     for (size_t r_id = 0; r_id < upload_requests.size(); r_id++)
     {
         const string& object_key = upload_requests.at(r_id).object_key;
@@ -114,28 +229,101 @@ void SimpleDB::put(vector<PutRequest>& upload_requests,
         buckets[bIdx].emplace_back(move(upload_requests.at(r_id)));
     }
 
-    for (size_t bIdx = 0; bIdx < bucket_count; bIdx++)
+    vector<size_t> non_empty_buckets;
+    for (size_t idx = 0; idx < bucket_count; idx++)
     {
-        if (bIdx == config_.replica_idx)
-        {
-            /* Local */
-            for (auto &req: buckets[bIdx])
-            {
-                auto status = local_put(req);
-                callback(req, status);
-            }
-        }
-        else
-        {
-            throw runtime_error("Not implemented!");
-        }
+        if (buckets[idx].size() > 0)
+            non_empty_buckets.push_back(idx);
     }
+
+    const size_t thread_count = non_empty_buckets.size();
+    vector<thread> threads;
+    for (size_t thread_index = 0;
+            thread_index < thread_count;
+            thread_index++)
+    {
+        threads.emplace_back(
+            [&](const size_t index)
+            {
+                const size_t bIdx = non_empty_buckets[index];
+
+                /* Local */
+                if (bIdx == config_.replica_idx)
+                {
+                    for (auto &req: buckets[bIdx])
+                    {
+                        auto status = local_put(req);
+                        callback(req, status);
+                    }
+                }
+                else
+                {
+                    for (size_t first_file_idx = 0;
+                        first_file_idx < buckets[bIdx].size();
+                        first_file_idx += batch_size)
+                    {
+                        size_t expected_responses = 0;
+
+                        for (size_t file_id = first_file_idx;
+                            file_id < min(buckets[bIdx].size(), first_file_idx + batch_size);
+                            file_id += 1)
+                        {
+                            string content;
+                            auto &request = buckets[bIdx].at(file_id);
+                            if (not request.object_data.initialized())
+                            {
+                                FileDescriptor file {
+                                    CheckSystemCall("open " + request.filename.get().string(),
+                                        open(request.filename.get().string().c_str(), O_RDONLY))
+                                };
+                                while (not file.eof())
+                                    { content.append(file.read()); }
+                                file.close();
+                            }
+
+                            simpledb::proto::KVRequest req;
+                            req.set_id(file_id);
+                            auto put_req = req.mutable_put_request();
+                            put_req->set_key(request.object_key);
+                            put_req->set_val(request.object_data.get_or(content));
+                            put_req->set_immutable(request.immutable);
+                            put_req->set_executable(request.executable);
+
+                            send_request(this->conns_[bIdx], req);
+                            expected_responses++;
+                        }
+
+                        size_t response_count = 0;
+                        while (response_count != expected_responses)
+                        {
+                            simpledb::proto::KVResponse resp;
+
+                            if (!receive_response(this->conns_[bIdx], resp))
+                                throw runtime_error("failed to get response");
+
+                            const size_t response_index = resp.id();
+                            auto &req = buckets[bIdx].at(response_index);
+                            callback(req, static_cast<DbOpStatus>(resp.return_code()));
+
+                            response_count++;
+                        }
+                    }
+                }
+            }, thread_index
+        );
+    }
+
+    for (auto & thread : threads)
+        thread.join();
 }
 
 void SimpleDB::del(const vector<string>& object_keys,
     const function<void(const string&,
                             const DbOpStatus)>& callback)
 {
+    if (!init)
+        connect();
+
     const size_t bucket_count = config_.num_;
 
     vector<vector<string>> buckets(bucket_count);
@@ -159,7 +347,23 @@ void SimpleDB::del(const vector<string>& object_keys,
         }
         else
         {
-            throw runtime_error("Not implemented!");
+            size_t expected_responses = 0;
+            for (auto & req: buckets[bIdx])
+            {
+                simpledb::proto::KVRequest request;
+                request.set_id(expected_responses++);
+                auto del_req = request.mutable_delete_request();
+                del_req->set_key(req);
+
+                send_request(this->conns_[bIdx], request);
+
+                simpledb::proto::KVResponse resp;
+
+                if (!receive_response(this->conns_[bIdx], resp))
+                    throw runtime_error("failed to get response");
+
+                callback(req, static_cast<DbOpStatus>(resp.return_code()));
+            }
         }
     }
 }

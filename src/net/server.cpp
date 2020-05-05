@@ -20,18 +20,18 @@ using namespace simpledb::proto;
 
 static void on_execution_completion(
             ExecutionState* exec_state,
-            const simpledb::proto::ExecResponse& response);
+            simpledb::proto::ExecResponse response);
 static void on_work_completion(uv_work_t* work, int status);
 
 static void on_execution_completion(
             ExecutionState* exec_state,
-            const simpledb::proto::ExecResponse& response)
+            simpledb::proto::ExecResponse response)
 {
     WorkRequest* work_request = new WorkRequest{exec_state->req_id,
                                                 exec_state->client,
                                                 WorkRequest::EXEC};
 
-    work_request->exec = std::move(response);
+    work_request->exec = response;
 
     uv_work_t* work = new uv_work_t();
     work->data = work_request;
@@ -118,6 +118,7 @@ void ServerState::Listen()
             return;
         }
 
+        LOG(ERROR) << "[CONNECTION]";
         ClientState* client = new ClientState((uv_tcp_t*) server);
         client->Read(on_new_request);
     };

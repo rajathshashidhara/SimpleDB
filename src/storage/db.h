@@ -89,15 +89,19 @@ namespace simpledb::storage
         SimpleDBConfig config_;
         leveldb::DB *db;
         std::deque<TCPSocket*> conns_;
+        bool init { false };
+
+
+        void connect();
+
+    public:
+        SimpleDB(const SimpleDBConfig& config);
+        ~SimpleDB() {}
 
         DbOpStatus local_get(const GetRequest& request,
             std::string& data);
         DbOpStatus local_put(const PutRequest& request);
         DbOpStatus local_del(const std::string& object_key);
-
-    public:
-        SimpleDB(const SimpleDBConfig& config);
-        ~SimpleDB() {}
 
         void get(std::vector<GetRequest>& download_requests,
             const std::function<void(const GetRequest&,

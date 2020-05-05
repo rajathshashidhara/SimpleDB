@@ -26,6 +26,13 @@ private:
     std::deque<std::string> write_buffer_;
     KVRequestCallback new_request_callback_;
 
+    friend void allocate_buffer_cb(uv_handle_t* handle,
+                                size_t suggested_size,
+                                uv_buf_t* buf);
+    friend void read_cb(uv_stream_t* handle,
+        ssize_t nread, const uv_buf_t* buf);
+    friend void write_cb(uv_write_t* req, int status);
+
 public:
     uv_loop_t* execution_loop;
 

@@ -58,6 +58,7 @@ struct WorkResult
 class Worker {
 private:
     static simpledb::storage::SimpleDB* db;
+    static roost::path cache_path;
     static void process_kv_request(const simpledb::proto::KVRequest& request,
                                     simpledb::proto::KVResponse& response);
     static void process_exec_request(const simpledb::proto::ExecRequest& request,
@@ -68,6 +69,7 @@ public:
     Worker(const simpledb::storage::SimpleDBConfig& config)
     {
         db = new simpledb::storage::SimpleDB(config);
+        cache_path = config.db_ / "cache";
     }
     ~Worker()
     {

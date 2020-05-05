@@ -41,50 +41,65 @@ ClientState::~ClientState()
     delete tcp_handle;
 }
 
+void allocate_buffer_cb(uv_handle_t* handle,
+                                size_t suggested_size,
+                                uv_buf_t* buf)
+{
+    auto state = (ClientState*) handle->data;
+    state->read_buffer_ = string(suggested_size, 0);
+    buf->base = &(state->read_buffer_[0]);
+    buf->len = suggested_size;
+}
+
+void read_cb(uv_stream_t* handle, ssize_t nread, const uv_buf_t* buf)
+{
+    ClientState* state = (ClientState*) handle->data;
+    if (nread == UV_EOF)
+    {
+        LOG(INFO) << "Connection closed. ";
+
+        delete state;
+        return;
+    }
+
+    state->parser.parse(state->read_buffer_.substr(0, nread));
+    state->read_buffer_.clear();
+
+    while (not state->parser.empty())
+    {
+        auto req = move(state->parser.front());
+        state->new_request_callback_(state->tcp_handle, req);
+
+        state->parser.pop();
+    }
+}
+
 void ClientState::Read(const KVRequestCallback& kv_cb)
 {
     int ret;
     new_request_callback_ = kv_cb;
-
-    static auto allocate_buffer_cb = [](uv_handle_t* handle,
-                                size_t suggested_size,
-                                uv_buf_t* buf)
-    {
-        auto state = (ClientState*) handle->data;
-        state->read_buffer_ = string(suggested_size, 0);
-        buf->base = &(state->read_buffer_[0]);
-        buf->len = suggested_size;
-    };
-
-    static auto read_cb = [](uv_stream_t* handle,
-        ssize_t nread, const uv_buf_t* buf)
-    {
-        ClientState* state = (ClientState*) handle->data;
-        if (nread == UV_EOF)
-        {
-            LOG(INFO) << "Connection closed. ";
-
-            delete state;
-            return;
-        }
-
-        state->parser.parse(state->read_buffer_.substr(0, nread));
-        state->read_buffer_.clear();
-
-        while (not state->parser.empty())
-        {
-            auto req = move(state->parser.front());
-            state->new_request_callback_(state->tcp_handle, req);
-
-            state->parser.pop();
-        }
-    };
 
     if ((ret = uv_read_start((uv_stream_t*) tcp_handle, allocate_buffer_cb, read_cb)) < 0)
     {
         LOG(ERROR) << "Failed to start read. Error: " << uv_strerror(ret);
         throw uv_error("Failed to read.", ret);
     }
+}
+
+void write_cb(uv_write_t* req, int status)
+{
+    auto *state = (ClientState*) req->data;
+    delete req;
+
+    if (status < 0)
+    {
+        LOG(ERROR) << "Write error: " << uv_strerror(status);
+
+        delete state;
+        return;
+    }
+
+    state->write_buffer_.pop_front();
 }
 
 void ClientState::Write(string && data)
@@ -96,22 +111,6 @@ void ClientState::Write(string && data)
     uv_buf_t writebuf = uv_buf_init(&(write_buffer_.back()[0]),
                             write_buffer_.back().length());
     write_req->data = this;
-
-    static auto write_cb = [](uv_write_t* req, int status)
-    {
-        auto *state = (ClientState*) req->data;
-        delete req;
-
-        if (status < 0)
-        {
-            LOG(ERROR) << "Write error: " << uv_strerror(status);
-
-            delete state;
-            return;
-        }
-
-        state->write_buffer_.pop_front();
-    };
 
     if ((ret = uv_write(write_req,
                     (uv_stream_t*) tcp_handle,

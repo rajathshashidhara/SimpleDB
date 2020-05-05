@@ -18,55 +18,36 @@ using namespace std;
 using namespace simpledb::proto;
 
 simpledb::storage::SimpleDB* Worker::db {nullptr};
+roost::path Worker::cache_path;
 
 void Worker::process_kv_request(const KVRequest& request,
                                     KVResponse& response)
 {
-    vector<simpledb::storage::GetRequest> get_requests;
-    vector<simpledb::storage::PutRequest> put_requests;
-    vector<string> delete_requests;
+    string content;
+    simpledb::storage::DbOpStatus status;
 
     switch(request.ReqOps_case())
     {
         case KVRequest::ReqOpsCase::kGetRequest:
             LOG(ERROR) << "GET " << request.get_request().key();
-            get_requests.emplace_back(request.get_request().key());
-            db->get(get_requests,
-                [&response](const simpledb::storage::GetRequest& request,
-                        const simpledb::storage::DbOpStatus status,
-                        const std::string& value)
-                {
-                    response.set_return_code(static_cast<uint32_t>(status));
-                    response.set_val(value);
-                }
-            );
+            status = db->local_get(simpledb::storage::GetRequest(request.get_request().key()), content);
+            response.set_return_code(static_cast<uint32_t>(status));
+            response.set_val(content);
             break;
 
         case KVRequest::ReqOpsCase::kPutRequest:
-            LOG(ERROR) << "PUT " << request.get_request().key();
-            put_requests.emplace_back(request.put_request().key(),
-                request.put_request().val(),
-                request.put_request().immutable(),
-                request.put_request().executable());
-            db->put(put_requests,
-                [&response](const simpledb::storage::PutRequest& request,
-                    const simpledb::storage::DbOpStatus status)
-                {
-                    response.set_return_code(static_cast<uint32_t>(status));
-                }
-            );
+            LOG(ERROR) << "PUT " << request.put_request().key();
+            status = db->local_put(simpledb::storage::PutRequest(request.put_request().key(),
+                                                                request.put_request().val(),
+                                                                request.put_request().immutable(),
+                                                                request.put_request().executable()));
+            response.set_return_code(static_cast<uint32_t>(status));
             break;
 
         case KVRequest::ReqOpsCase::kDeleteRequest:
-            LOG(ERROR) << "DEL " << request.get_request().key();
-            delete_requests.push_back(request.delete_request().key());
-            db->del(delete_requests,
-                [&response](const string& request,
-                    const simpledb::storage::DbOpStatus status)
-                {
-                    response.set_return_code(static_cast<uint32_t>(status));
-                }
-            );
+            LOG(ERROR) << "DEL " << request.delete_request().key();
+            status = db->local_del(request.delete_request().key());
+            response.set_return_code(static_cast<uint32_t>(status));
             break;
 
         default:
@@ -82,8 +63,8 @@ void Worker::process_exec_request(const ExecRequest& request,
     LOG(ERROR) << "EXEC";
     vector<simpledb::storage::GetRequest> get_requests;
 
-    cmd.set_function(request.func());
-    auto executable_path = roost::path(DEFAULT_CACHE_PATH) / request.func();
+    auto executable_path = roost::path(cache_path) / request.func();
+    cmd.set_function(executable_path.string());
     if (not roost::exists(executable_path, X_OK))
     {
         get_requests.emplace_back(request.func(), executable_path,
@@ -101,7 +82,7 @@ void Worker::process_exec_request(const ExecRequest& request,
     auto fargs = cmd.mutable_fargs();
     for (auto &arg: request.file_args())
     {
-        auto file_path = roost::path(DEFAULT_CACHE_PATH) / arg;
+        auto file_path = roost::path(cache_path) / arg;
         if (not roost::exists(file_path, F_OK))
         {
             get_requests.emplace_back(arg, file_path, 0444, false);
@@ -204,6 +185,7 @@ void Worker::process_work(uv_work_t* work)
                     break;
 
                 default:
+                    LOG(ERROR) << "Invalid Op: " << work_request->kv.ReqOps_case();
                     throw runtime_error("Unknown KVRequest Op!");
             }
             break;
