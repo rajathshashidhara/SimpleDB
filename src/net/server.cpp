@@ -1,4 +1,5 @@
 #include <string>
+#include <queue>
 #include <exception>
 #include <glog/logging.h>
 
@@ -18,6 +19,9 @@ extern "C" {
 using namespace std;
 using namespace simpledb::proto;
 
+static queue<ExecutionState*> pending_execution;
+static unsigned running_execution;
+
 static void on_execution_completion(
             ExecutionState* exec_state,
             simpledb::proto::ExecResponse response);
@@ -27,6 +31,7 @@ static void on_execution_completion(
             ExecutionState* exec_state,
             simpledb::proto::ExecResponse response)
 {
+    running_execution--;
     WorkRequest* work_request = new WorkRequest{exec_state->req_id,
                                                 exec_state->client,
                                                 WorkRequest::EXEC};
@@ -42,6 +47,14 @@ static void on_execution_completion(
     {
         LOG(ERROR) << "Failed to launch work handler. Error: " << uv_strerror(ret);
         throw uv_error("Failed to launch work handler", ret);
+    }
+
+    if (!pending_execution.empty())
+    {
+        running_execution++;
+        auto execution = pending_execution.front();
+        pending_execution.pop();
+        execution->Spawn(on_execution_completion);
     }
 }
 
@@ -77,7 +90,15 @@ static void on_work_completion(uv_work_t* work, int status)
                         work_result->exec.function(),
                         move(work_result->exec)
                 );
-            exec->Spawn(on_execution_completion);
+            if (running_execution < DEFAULT_MAX_EXECUTIONS)
+            {
+                running_execution++;
+                exec->Spawn(on_execution_completion);
+            }
+            else
+            {
+                pending_execution.push(exec);
+            }
             break;
 
         default:

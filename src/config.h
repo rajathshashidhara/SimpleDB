@@ -10,4 +10,6 @@
 #define DEFAULT_EXEC_PATH               DEFAULT_DB_PATH "/exec"
 #define DEFAULT_CACHE_PATH              DEFAULT_DB_PATH "/cache"
 
+#define DEFAULT_MAX_EXECUTIONS          1
+
 #endif /* SIMPLEDB_CONFIG */
