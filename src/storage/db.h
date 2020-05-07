@@ -12,6 +12,7 @@
 #include "util/optional.h"
 #include "net/socket.h"
 #include "net/address.h"
+#include "storage/cache.h"
 
 namespace simpledb::storage
 {
@@ -76,7 +77,8 @@ namespace simpledb::storage
 
         roost::path db_;
         bool create_if_not_exists { true };
-        size_t cache_size;
+        size_t backend_cache_size;
+        size_t immutable_cache_size;
 
         size_t max_batch_size {32};
 
@@ -90,7 +92,7 @@ namespace simpledb::storage
         leveldb::DB *db;
         std::deque<TCPSocket*> conns_;
         bool init { false };
-
+        Cache immutable_object_cache_;
 
         void connect();
 

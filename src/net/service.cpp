@@ -1,4 +1,6 @@
 #include <string>
+#include <chrono>
+#include <iostream>
 #include <fstream>
 #include <glog/logging.h>
 
@@ -15,6 +17,7 @@ extern "C" {
 }
 
 using namespace std;
+using namespace std::chrono;
 using namespace simpledb::proto;
 
 simpledb::storage::SimpleDB* Worker::db {nullptr};
@@ -71,11 +74,17 @@ void Worker::process_exec_request(const ExecRequest& request,
                                                         0544, true);
     }
 
+#ifdef GG_DB_TIMELOG
+    string thunk;
+#endif
     // Add Immediate Args
     auto imm_args = cmd.mutable_args();
     for (auto &arg : request.immediate_args())
     {
         imm_args->Add()->assign(arg);
+#ifdef GG_DB_TIMELOG
+        thunk = arg;
+#endif
     }
 
     // Add File Args
@@ -96,6 +105,9 @@ void Worker::process_exec_request(const ExecRequest& request,
         get_requests.emplace_back(kwarg, false);
     }
 
+#ifdef GG_DB_TIMELOG
+    auto before = duration_cast<milliseconds>(system_clock::now().time_since_epoch());
+#endif
     db->get(get_requests,
         [&](const simpledb::storage::GetRequest& req,
         const simpledb::storage::DbOpStatus status,
@@ -115,6 +127,11 @@ void Worker::process_exec_request(const ExecRequest& request,
             }
         }
     );
+#ifdef GG_DB_TIMELOG
+    auto after = duration_cast<milliseconds>(system_clock::now().time_since_epoch());
+    std::cerr << "Thunk: " << thunk << std::endl;
+    std::cerr << "get_dependencies " << (after - before).count() << std::endl;
+#endif
 }
 
 void Worker::process_exec_result(const simpledb::proto::ExecResponse& result,
@@ -147,6 +164,9 @@ void Worker::process_exec_result(const simpledb::proto::ExecResponse& result,
         );
     }
 
+#ifdef GG_DB_TIMELOG
+    auto before = duration_cast<milliseconds>(system_clock::now().time_since_epoch());
+#endif
     db->put(put_requests,
         [](const simpledb::storage::PutRequest& req,
         const simpledb::storage::DbOpStatus status)
@@ -157,6 +177,10 @@ void Worker::process_exec_result(const simpledb::proto::ExecResponse& result,
                 );
         }
     );
+#ifdef GG_DB_TIMELOG
+    auto after = duration_cast<milliseconds>(system_clock::now().time_since_epoch());
+    std::cerr << "upload_output " << (after - before).count() << std::endl;
+#endif
 }
 
 void Worker::process_work(uv_work_t* work)

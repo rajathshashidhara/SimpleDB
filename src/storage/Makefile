@@ -7,7 +7,8 @@ CPPFLAGS := -I$(DIR) \
 			-I$(DIR_LIBUV)/include \
 			-I$(DIR_LEVELDB)/include
 
-CXX_SRCS := db.cpp
+CXX_SRCS := db.cpp\
+			cache.cpp
 CXX_OBJS := $(CXX_SRCS:.cpp=.o)
 CXX_DEPS := $(CXX_SRCS:.cpp=.d)
 

@@ -48,11 +48,11 @@ static inline bool receive_response(TCPSocket* socket, simpledb::proto::KVRespon
 }
 
 SimpleDB::SimpleDB(const SimpleDBConfig& config)
-    : config_(config), db(nullptr), conns_(config.num_, nullptr)
+    : config_(config), db(nullptr), conns_(config.num_, nullptr), immutable_object_cache_(config.immutable_cache_size)
 {
     leveldb::Options options;
     options.create_if_missing = config_.create_if_not_exists;
-    options.block_cache = leveldb::NewLRUCache(config_.cache_size);
+    options.block_cache = leveldb::NewLRUCache(config_.backend_cache_size);
     options.error_if_exists = false;
 
     leveldb::Status status = leveldb::DB::Open(options,
@@ -160,6 +160,23 @@ void SimpleDB::get(vector<GetRequest>& download_requests,
                             const string & object_key =
                                 buckets[bIdx].at(file_id).object_key;
 
+                            /* Check cache */
+                            string content;
+                            if (immutable_object_cache_.access(object_key, content))
+                            {
+                                if (buckets[bIdx].at(file_id).filename.initialized())
+                                {
+                                    roost::atomic_create(content,
+                                        buckets[bIdx].at(file_id).filename.get(),
+                                        buckets[bIdx].at(file_id).mode.initialized(),
+                                        buckets[bIdx].at(file_id).mode.get_or(0));
+                                }
+
+                                callback(buckets[bIdx].at(file_id), DbOpStatus::STATUS_OK, content);
+
+                                continue;
+                            }
+
                             simpledb::proto::KVRequest req;
                             req.set_id(file_id);
                             auto get_req = req.mutable_get_request();
@@ -189,6 +206,7 @@ void SimpleDB::get(vector<GetRequest>& download_requests,
 
                             // LOG(ERROR) << "GOT " << req.object_key << " FROM " << bIdx;
                             content = std::move(resp.val());
+                            immutable_object_cache_.insert(req.object_key, content);
                             if (req.filename.initialized())
                             {
                                 roost::atomic_create(content, req.filename.get(),
@@ -290,6 +308,10 @@ void SimpleDB::put(vector<PutRequest>& upload_requests,
                             put_req->set_executable(request.executable);
 
                             send_request(this->conns_[bIdx], req);
+                            if (request.immutable)
+                            {
+                                immutable_object_cache_.insert(request.object_key, request.object_data.get_or(content));
+                            }
                             expected_responses++;
                         }
 
@@ -303,6 +325,11 @@ void SimpleDB::put(vector<PutRequest>& upload_requests,
 
                             const size_t response_index = resp.id();
                             auto &req = buckets[bIdx].at(response_index);
+
+                            if (DbOpStatus::STATUS_OK != static_cast<DbOpStatus>(resp.return_code()))
+                            {
+                                immutable_object_cache_.drop(req.object_key);
+                            }
                             callback(req, static_cast<DbOpStatus>(resp.return_code()));
 
                             response_count++;
@@ -356,6 +383,7 @@ void SimpleDB::del(const vector<string>& object_keys,
                 del_req->set_key(req);
 
                 send_request(this->conns_[bIdx], request);
+                immutable_object_cache_.drop(req);
 
                 simpledb::proto::KVResponse resp;
 

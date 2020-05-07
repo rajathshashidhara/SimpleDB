@@ -57,6 +57,8 @@ int main(int argc, char* argv[])
         config.replica_idx = 0;
     }
     config.db_ = path;
+    config.backend_cache_size = 100 * 1024 * 1024; // 100 M
+    config.immutable_cache_size = 100 * 1024 * 1024; // 100 M
 
     uv_loop_t* execution_loop = uv_default_loop();
     Worker worker_(config);
