@@ -1,4 +1,5 @@
 #include <string>
+#include <iostream>
 #include <cstdlib>
 #include <glog/logging.h>
 

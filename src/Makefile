@@ -15,7 +15,7 @@ CPPFLAGS := -I$(DIR) \
 		-I$(DIR_LEVELDB)/include \
 		-I$(DIR_LIBUV)/include \
 
-CXXFLAGS := -g3 -Wall -Werror -MD -MP
+CXXFLAGS := -g3 -O2 -Wall -Werror -MD -MP
 
 LDFLAGS := -L$(DIR_LEVELDB)/build \
 			-L$(DIR_LIBUV)/.libs \

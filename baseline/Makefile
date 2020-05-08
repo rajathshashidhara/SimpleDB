@@ -2,7 +2,7 @@ DIR := $(shell pwd)
 DIR_LEVELDB := $(DIR)/../leveldb
 DIR_LIBUV := $(DIR)/../libuv
 
-CXX_FLAGS := -g3 -Wall -Werror
+CXX_FLAGS := -g3 -O2 -Wall -Werror
 
 PRSRCS := gg.proto
 PRCPPS := $(PRSRCS:.proto=.pb.cc)

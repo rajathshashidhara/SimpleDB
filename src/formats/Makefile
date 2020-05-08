@@ -1,5 +1,5 @@
 
-CXX_FLAGS := -g3 -Wall -Werror
+CXX_FLAGS := -g3 -O2 -Wall -Werror
 
 LIB := libformats.a
 

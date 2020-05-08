@@ -16,7 +16,7 @@ CXX_SRCS := address.cpp \
 CXX_OBJS := $(CXX_SRCS:.cpp=.o)
 CXX_DEPS := $(CXX_SRCS:.cpp=.d)
 
-CXXFLAGS := -g3 -Wall -Werror -MD -MP
+CXXFLAGS := -g3 -O2 -Wall -Werror -MD -MP
 
 LIB := libnet.a
 
