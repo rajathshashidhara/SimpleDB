@@ -6,9 +6,11 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <climits>
+#include <errno.h>
 
 #include <glog/logging.h>
-#include <errno.h>
+#include <google/protobuf/io/coded_stream.h>
 
 #include "leveldb/db.h"
 #include "leveldb/cache.h"
@@ -41,7 +43,10 @@ static inline bool receive_response(TCPSocket* socket, simpledb::proto::KVRespon
 
     len = *((size_t*) (&socket->read_exactly(slen)[0]));
 
-    if (!resp.ParseFromString(socket->read_exactly(len)))
+    string data = move(socket->read_exactly(len));
+    google::protobuf::io::CodedInputStream istream((const uint8_t*) data.c_str(), data.length());
+    istream.SetTotalBytesLimit(INT_MAX, INT_MAX);
+    if (!resp.ParseFromCodedStream(&istream))
         return false;
 
     return true;
@@ -414,7 +419,9 @@ DbOpStatus SimpleDB::local_get(const GetRequest& request, std::string& data)
     }
 
     simpledb::proto::FileMetadata file;
-    if (!file.ParseFromString(val))
+    google::protobuf::io::CodedInputStream istream((const uint8_t*) val.c_str(), val.length());
+    istream.SetTotalBytesLimit(INT_MAX, INT_MAX);
+    if (!file.ParseFromCodedStream(&istream))
     {
         LOG(ERROR) << "Get Key=" << request.object_key << " Error: Protobuf Parse error";
         return DbOpStatus::STATUS_IOERROR;
@@ -443,7 +450,9 @@ DbOpStatus SimpleDB::local_put(const PutRequest& request)
     leveldb::Status s = db->Get(leveldb::ReadOptions(), request.object_key, &val);
     if (!s.IsNotFound())
     {
-        if (!file.ParseFromString(val))
+        google::protobuf::io::CodedInputStream istream((const uint8_t*) val.c_str(), val.length());
+        istream.SetTotalBytesLimit(INT_MAX, INT_MAX);
+        if (!file.ParseFromCodedStream(&istream))
         {
             LOG(ERROR) << "Set Key=" << request.object_key << " Error: Protobuf Parse error";
             return DbOpStatus::STATUS_IOERROR;
