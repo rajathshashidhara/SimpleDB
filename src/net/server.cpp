@@ -139,7 +139,7 @@ void ServerState::Listen()
             return;
         }
 
-        LOG(ERROR) << "[CONNECTION]";
+        // LOG(ERROR) << "[CONNECTION]";
         ClientState* client = new ClientState((uv_tcp_t*) server);
         client->Read(on_new_request);
     };

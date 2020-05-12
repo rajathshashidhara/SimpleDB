@@ -32,14 +32,14 @@ void Worker::process_kv_request(const KVRequest& request,
     switch(request.ReqOps_case())
     {
         case KVRequest::ReqOpsCase::kGetRequest:
-            LOG(ERROR) << "GET " << request.get_request().key();
+            // LOG(ERROR) << "GET " << request.get_request().key();
             status = db->local_get(simpledb::storage::GetRequest(request.get_request().key()), content);
             response.set_return_code(static_cast<uint32_t>(status));
             response.set_val(content);
             break;
 
         case KVRequest::ReqOpsCase::kPutRequest:
-            LOG(ERROR) << "PUT " << request.put_request().key();
+            // LOG(ERROR) << "PUT " << request.put_request().key();
             status = db->local_put(simpledb::storage::PutRequest(request.put_request().key(),
                                                                 request.put_request().val(),
                                                                 request.put_request().immutable(),
@@ -48,7 +48,7 @@ void Worker::process_kv_request(const KVRequest& request,
             break;
 
         case KVRequest::ReqOpsCase::kDeleteRequest:
-            LOG(ERROR) << "DEL " << request.delete_request().key();
+            // LOG(ERROR) << "DEL " << request.delete_request().key();
             status = db->local_del(request.delete_request().key());
             response.set_return_code(static_cast<uint32_t>(status));
             break;
@@ -63,7 +63,7 @@ void Worker::process_kv_request(const KVRequest& request,
 void Worker::process_exec_request(const ExecRequest& request,
                                     ExecArgs& cmd)
 {
-    LOG(ERROR) << "EXEC";
+    // LOG(ERROR) << "EXEC";
     vector<simpledb::storage::GetRequest> get_requests;
 
     auto executable_path = roost::path(cache_path) / request.func();
