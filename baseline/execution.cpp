@@ -43,6 +43,9 @@ void handler(const ExecutionRequest& req, ExecutionResponse& resp)
 
     setenv("GG_STORAGE_URI", storage_uri.c_str(), true);
     system("rm -rf /tmp/thunk-execute.*");
+    system("rm -rf /home/rajaths/gg-dir");
+    system("mkdir -p /home/rajaths/gg-dir/blobs");
+    system("mkdir -p /home/rajaths/gg-dir/reductions");
 
     bool tried_once = false;
     while (true)
