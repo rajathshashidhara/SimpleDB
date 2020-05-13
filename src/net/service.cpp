@@ -129,7 +129,6 @@ void Worker::process_exec_request(const ExecRequest& request,
     );
 #ifdef GG_DB_TIMELOG
     auto after = duration_cast<milliseconds>(system_clock::now().time_since_epoch());
-    std::cerr << "Thunk: " << thunk << std::endl;
     std::cerr << "get_dependencies " << (after - before).count() << std::endl;
 #endif
 }

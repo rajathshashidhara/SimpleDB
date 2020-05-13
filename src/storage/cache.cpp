@@ -24,6 +24,10 @@ void Cache::insert(const string& key, const string& val)
     const lock_guard<mutex> lguard(lock_);
 
     const auto len = key.length() + val.length();
+
+    if (len > capacity_)
+        return;
+
     while (size_ + len > capacity_)
     {
         auto &drop = lru_cache_.back();
