@@ -138,8 +138,12 @@ void SimpleDB::get(vector<GetRequest>& download_requests,
         threads.emplace_back(
             [&](const size_t index)
             {
+
                 const size_t bIdx = non_empty_buckets[index];
                 // LOG(ERROR) << "tID=" << index << " bIdx=" << bIdx << " Replica= " << config_.replica_idx << " Size=" << buckets[bIdx].size();
+                TCPSocket conn;
+                conn.connect(config_.address_[bIdx]);
+
                 /* Local */
                 if (bIdx == config_.replica_idx)
                 {
@@ -169,6 +173,7 @@ void SimpleDB::get(vector<GetRequest>& download_requests,
                             string content;
                             if (immutable_object_cache_.access(object_key, content))
                             {
+                                LOG(ERROR) << "Cache Hit!";
                                 if (buckets[bIdx].at(file_id).filename.initialized())
                                 {
                                     roost::atomic_create(content,
@@ -182,13 +187,14 @@ void SimpleDB::get(vector<GetRequest>& download_requests,
                                 continue;
                             }
 
+                            LOG(ERROR) << "Cache Miss!";
                             simpledb::proto::KVRequest req;
                             req.set_id(file_id);
                             auto get_req = req.mutable_get_request();
                             get_req->set_key(object_key);
 
                             // LOG(ERROR) << "GET " << object_key << " FROM " << bIdx;
-                            send_request(this->conns_[bIdx], req);
+                            send_request(&conn, req);
                             expected_responses++;
                         }
 
@@ -197,7 +203,7 @@ void SimpleDB::get(vector<GetRequest>& download_requests,
                         {
                             simpledb::proto::KVResponse resp;
 
-                            if (!receive_response(this->conns_[bIdx], resp))
+                            if (!receive_response(&conn, resp))
                                 throw runtime_error("failed to get response");
 
                             const size_t response_index = resp.id();
@@ -269,6 +275,8 @@ void SimpleDB::put(vector<PutRequest>& upload_requests,
             [&](const size_t index)
             {
                 const size_t bIdx = non_empty_buckets[index];
+                TCPSocket conn;
+                conn.connect(config_.address_[bIdx]);
 
                 /* Local */
                 if (bIdx == config_.replica_idx)
@@ -312,7 +320,7 @@ void SimpleDB::put(vector<PutRequest>& upload_requests,
                             put_req->set_immutable(request.immutable);
                             put_req->set_executable(request.executable);
 
-                            send_request(this->conns_[bIdx], req);
+                            send_request(&conn, req);
                             if (request.immutable)
                             {
                                 immutable_object_cache_.insert(request.object_key, request.object_data.get_or(content));
@@ -325,7 +333,7 @@ void SimpleDB::put(vector<PutRequest>& upload_requests,
                         {
                             simpledb::proto::KVResponse resp;
 
-                            if (!receive_response(this->conns_[bIdx], resp))
+                            if (!receive_response(&conn, resp))
                                 throw runtime_error("failed to get response");
 
                             const size_t response_index = resp.id();
